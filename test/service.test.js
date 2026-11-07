@@ -138,6 +138,19 @@ test('hostStats forwards probe notes and survives a missing disk', async () => {
   assert.match(value.notes.join('\n'), /process_table_unavailable/);
 });
 
+test('hostStats excludes the host and parent from dev highlights', async () => {
+  const processes = [
+    makeProcess({ pid: 100, name: 'node.exe', commandLine: 'node vite --port 5173' }),
+    makeProcess({ pid: 4242, name: 'node.exe', commandLine: 'node vite --port 4242' }),
+    makeProcess({ pid: 1, name: 'pwsh.exe', commandLine: 'pwsh -Command node vite' }),
+  ];
+  const snapshot = makeProcessSnapshot(START, processes);
+  const second = makeProcessSnapshot(START + 100, processes);
+  const { service } = createHarness({ processTables: [snapshot, second] });
+  const value = await service.hostStats({ includeGpu: false });
+  assert.deepEqual(value.devProcesses.map((process) => process.pid), [100]);
+});
+
 test('portsList lists listeners, joins names, and flags known and requested ports', async () => {
   const names = makeProcessSnapshot(START, [
     makeProcess({ pid: 100, name: 'node.exe' }),
@@ -213,7 +226,17 @@ test('staleDevProcesses classifies leftover dev processes with suggested targets
       startedAt: new Date(START - 4 * HOUR).toISOString(),
       commandLine: 'java -Dorg.gradle.appname=gradle GradleDaemon',
     }),
-    makeProcess({ pid: 102, name: 'explorer.exe', commandLine: 'explorer.exe' }),
+    makeProcess({
+      pid: 102,
+      name: 'explorer.exe',
+      commandLine: 'explorer.exe',
+    }),
+    makeProcess({
+      pid: 4242,
+      name: 'node.exe',
+      startedAt: new Date(START - 2 * HOUR).toISOString(),
+      commandLine: 'node C:/workspace/app/node_modules/vite/bin/vite.js --port 4242',
+    }),
   ];
   const snapshot = makeProcessSnapshot(START, processes);
   const second = makeProcessSnapshot(START + 100, processes);
@@ -224,6 +247,7 @@ test('staleDevProcesses classifies leftover dev processes with suggested targets
   const value = await service.staleDevProcesses();
   assert.equal(value.ok, true);
   assert.equal(value.count, 2);
+  assert.equal(value.entries.some((entry) => entry.pid === 4242), false);
   const preview = value.entries.find((entry) => entry.pid === 100);
   assert.ok(preview);
   assert.equal(preview.stale, true);

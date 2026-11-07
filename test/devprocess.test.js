@@ -158,3 +158,18 @@ test('collectStaleCandidates respects the stale threshold and entry limit', () =
   });
   assert.equal(limited.length, 1);
 });
+
+test('collectStaleCandidates excludes the harness host and parent PIDs', () => {
+  const processes = [
+    makeProcess({ pid: 100, name: 'node.exe', commandLine: 'node vite preview' }),
+    makeProcess({ pid: 4242, name: 'node.exe', commandLine: 'node vite preview' }),
+    makeProcess({ pid: 900, name: 'pwsh.exe', commandLine: 'pwsh -Command node vite preview' }),
+  ];
+  const candidates = collectStaleCandidates({
+    processes,
+    listeners: [],
+    now,
+    excludePids: [4242, 900],
+  });
+  assert.deepEqual(candidates.map((candidate) => candidate.pid), [100]);
+});
