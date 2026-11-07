@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-host-health
+      name: '@darkmintis/dsh-host-health'
+      config: {}

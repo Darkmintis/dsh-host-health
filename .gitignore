@@ -1,0 +1,10 @@
+node_modules/
+*.log
+coverage/
+.DS_Store
+.env
+.env.*
+.tmp/
+.tmp-*
+npm-debug.log*
+*.tgz

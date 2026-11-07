@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "Host health",
+    "description": "Inspect host resources, port listeners, and stale dev processes, and stop leftovers with approval."
+  },
+  "row.host_stats.title": "Host stats",
+  "row.host_stats.summary": "RAM, CPU, disk, and top processes",
+  "row.ports_list.title": "Port list",
+  "row.ports_list.summary": "TCP listeners and known dev ports",
+  "row.stale_dev_processes.title": "Stale dev processes",
+  "row.stale_dev_processes.summary": "Leftover servers, emulators, and daemons",
+  "row.port_kill.title": "Port kill",
+  "row.port_kill.summary": "Free a listening port",
+  "row.process_kill.title": "Process kill",
+  "row.process_kill.summary": "Terminate one process",
+  "row.preparing": "Preparing...",
+  "row.running": "Reading host...",
+  "row.failed": "Failed",
+  "row.noData": "No data"
+}
