@@ -1,0 +1,5 @@
+    4     0   0.0    96 00:02:00 [System]
+ 1234   900   2.5 262144 00:00:45 node /home/dev/app/node_modules/vite/bin/vite.js --port 5173
+ 2222   900   1.2 1048576 00:00:09 chrome --remote-debugging-port=9222
+ 5555  1234   0.3    1024 1:02:03 java -Dorg.gradle.appname=gradle GradleDaemon
+ 7777   900   0.0       0 2-01:02:03 node /srv/long-lived.js
