@@ -81,10 +81,16 @@ export function makeProcessSnapshot(at, processes) {
 /**
  * @param {number} at
  * @param {import('../lib/types.js').PortListener[]} listeners
+ * @param {{ available?: boolean, source?: 'powershell'|'netstat'|'ss'|'lsof'|null }} [overrides]
  * @returns {import('../lib/types.js').ListenerSnapshot}
  */
-export function makeListenerSnapshot(at, listeners) {
-  return { at, listeners };
+export function makeListenerSnapshot(at, listeners, overrides = {}) {
+  return {
+    at,
+    listeners,
+    available: overrides.available ?? true,
+    source: overrides.source ?? 'powershell',
+  };
 }
 
 /**

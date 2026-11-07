@@ -104,7 +104,7 @@ Snapshot host resources, top processes, and dev highlights. Read-only.
 }
 ```
 
-Top lists are capped at 8 entries; RAM and CPU values are rounded; command lines are truncated.
+Top lists are capped at 8 entries; RAM and CPU values are rounded; command lines are truncated. GPU data is best-effort: when `nvidia-smi` is absent or no NVIDIA GPU exists the value is `null`, `gpuStatus` is `"unavailable"`, and the rendered output explicitly says `GPU: not available` (it is never an error). Setting `includeGpu: false` reports `gpuStatus: "skipped"` and omits the line.
 
 ### `ports_list`
 
@@ -112,11 +112,14 @@ List TCP listeners and flag known dev ports plus any requested ones. Read-only.
 
 - Arguments: `{}` or `{ "ports": [8787, 3000] }` (extra ports to flag, integers 1–65535).
 - Known dev ports always flagged: **8787** (web preview), **5554** (Android emulator console), **8000** (local HTTP server), **5173** (Vite dev server), **53365** (DeepSeek Harness Web UI).
+- Listener sources: bounded `Get-NetTCPConnection` (15 s) with an automatic bounded `netstat -ano -p tcp` fallback on Windows; `ss`/`lsof` on macOS/Linux. When every listener probe fails, the result has `available: false` and every flagged port status is `unknown` — the tool never claims there are zero listeners.
 - Example result (abbreviated):
 
 ```json
 {
   "ok": true,
+  "available": true,
+  "source": "powershell",
   "listeners": [{ "port": 5173, "address": "127.0.0.1", "pid": 1234, "name": "node.exe", "knownDevPort": true, "devLabel": "Vite dev server" }],
   "flagged": [
     { "port": 5173, "status": "in_use", "pid": 1234, "name": "node.exe", "knownDevPort": true, "devLabel": "Vite dev server" },
@@ -164,9 +167,10 @@ Detect leftover dev tooling and explain it. Read-only.
 Kill the single process listening on a port. **Approval required.**
 
 - Arguments: `{ "port": 5173 }`.
-- Flow: approval prompt → fresh listener read → exactly one owner required → fresh process identity read → system/self/parent refusal checks → listener re-read immediately before the signal → `SIGTERM` (TerminateProcess on Windows) → bounded verification window.
-- Success: `{ "ok": true, "killed": { "port": 5173, "pid": 1234, "name": "node.exe" }, "verifiedGone": true, "method": "SIGTERM" }`.
-- Failures are structured: `no_listener`, `ambiguous_listener`, `process_not_found`, `identity_changed`, `protected_pid`, `protected_process`, `self_protected`, `parent_protected`, `access_denied`, `kill_failed`, `unsupported_platform`, `invalid_port`.
+- Flow: approval prompt → fresh listener read (PowerShell primary or netstat fallback) → exactly one owner required → fresh process identity read → system/self/parent refusal checks → listener re-read immediately before the signal via the same source → `SIGTERM` (TerminateProcess on Windows) → bounded verification window.
+- Success: `{ "ok": true, "killed": { "port": 5173, "pid": 1234, "name": "node.exe" }, "verifiedGone": true, "method": "SIGTERM", "listenerSource": "powershell" }`.
+- Failures are structured: `no_listener`, `ambiguous_listener`, `listener_probe_unavailable`, `process_not_found`, `identity_changed`, `protected_pid`, `protected_process`, `self_protected`, `parent_protected`, `access_denied`, `kill_failed`, `unsupported_platform`, `invalid_port`.
+- If the listener table is unavailable at any point (both listener probes failed), the kill is refused with `listener_probe_unavailable` — it never kills blind from a stale or empty table.
 
 ### `process_kill`
 
@@ -194,7 +198,7 @@ Kill one local process by PID. **Approval required.**
 | RAM/CPU/disk/uptime | Node builtins | Node builtins | Node builtins |
 | Process table | `Get-CimInstance Win32_Process` (bounded PowerShell) | `ps` | `ps` |
 | CPU per process | Cumulative CPU-time deltas | Cumulative CPU-time deltas | Cumulative CPU-time deltas |
-| TCP listeners | `Get-NetTCPConnection` | `lsof`, `ss` fallback | `ss`, `lsof` fallback |
+| TCP listeners | `Get-NetTCPConnection` (15 s bound) → `netstat -ano -p tcp` fallback | `lsof`, `ss` fallback | `ss`, `lsof` fallback |
 | GPU | `nvidia-smi` if installed | `nvidia-smi` if installed | `nvidia-smi` if installed |
 | Kills | `process.kill` (no elevation) | `SIGTERM` | `SIGTERM` |
 
@@ -204,8 +208,9 @@ macOS/Linux support is implemented and unit-tested against captured fixtures but
 
 - **`process_table_unavailable: ... spawn EPERM`** — the plugin is running inside a sandbox that forbids child processes. In a normal DSH Host process the probes work; in restricted shells they fail closed with this note. Run the tool from a normal DSH session.
 - **`process_table_unavailable: ... no PowerShell executable available`** — Windows needs `pwsh` (PowerShell 7+) or `powershell.exe` on `PATH`. Install PowerShell 7 or add Windows PowerShell to `PATH`.
-- **`note: listener_probe_unavailable`** — `Get-NetTCPConnection` failed (rare) or no `ss`/`lsof` on macOS/Linux. `host_stats` still works.
-- **GPU shows `null`** — no `nvidia-smi` on `PATH` or no NVIDIA GPU. This is never an error.
+- **`listener_probe_unavailable`** — both the bounded `Get-NetTCPConnection` probe (15 s) and the bounded `netstat -ano -p tcp` fallback failed (or, on macOS/Linux, both `ss` and `lsof` failed). `ports_list` reports `available: false` with “probe unavailable”, not “0 listeners”; `stale_dev_processes` continues without port associations; `port_kill` refuses because it cannot re-verify the target. `host_stats` remains unaffected.
+- **`listener_probe_fallback` note** — the primary listener probe timed out or failed, so the bounded `netstat` fallback supplied the table. This is expected on slow machines where a cold `pwsh` plus `Get-NetTCPConnection` exceeds the 15 s bound; subsequent probes reuse the fallback source.
+- **GPU shows `null` / `GPU: not available`** — no `nvidia-smi` on `PATH` or no NVIDIA GPU. This is never an error; `gpuStatus` reports `"unavailable"` and the line is explicit instead of silently missing.
 - **`ambiguous_listener`** — more than one distinct PID listens on the port (for example an IPv4 forwarder and a different IPv6 process). Inspect `ports_list` and use `process_kill` with the intended PID.
 - **`identity_changed` / `process_not_found`** — the process exited or the PID was reused between approval and the kill. Re-run `ports_list`/`stale_dev_processes`; nothing was killed.
 - **`access_denied`** — the target is elevated or owned by another user. The plugin deliberately does not request admin rights.
@@ -233,7 +238,8 @@ Design rules:
 - **Injectable everything.** The probe runner, system adapter, process control, clock, and sleep are constructor arguments, so tests are deterministic and never depend on live CIM or a real process table.
 - **Bounded probes only.** Every child process has a hard timeout, captured output, an output-size cap, and an argument vector (never a shell). No streaming, no unbounded reads.
 - **Pure logic, thin I/O.** Parsers, CPU math, classification, thresholds, and renderers are pure functions tested against fixtures; the service composes them.
-- **Fixture-tested parsing.** `test/fixtures/` contains captured PowerShell/`ps`/`ss`/`lsof`/`nvidia-smi` outputs. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Fixture-tested parsing.** `test/fixtures/` contains captured PowerShell/`ps`/`ss`/`lsof`/`netstat`/`nvidia-smi` outputs. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Honest unavailability.** A failed listener probe is reported as `available: false` (never an empty table), both probe reasons are surfaced, and destructive tools refuse rather than act on unknown state. Listener probes get a longer bounded timeout (15 s) because `Get-NetTCPConnection` is slow, with a bounded `netstat` fallback.
 - **Client safety.** The client half requires only `react`; malformed blocks render `null`; no DOM writes, timers, fetches, or first-party imports.
 
 ## Documentation

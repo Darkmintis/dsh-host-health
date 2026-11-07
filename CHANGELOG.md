@@ -4,9 +4,12 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- Nothing yet.
+- `ports_list` on Windows no longer fails when a cold `pwsh` plus `Get-NetTCPConnection` exceeds the probe timeout: the primary listener probe now gets a bounded 15 s timeout and automatically falls back to a bounded `netstat -ano -p tcp` parse. If both probes fail, the tool reports `available: false` with both failure reasons and every flagged port status is `unknown` instead of claiming zero listeners.
+- `port_kill` re-verifies the listener through the same fallback source and refuses with `listener_probe_unavailable` when the listener table cannot be read — it never kills blind.
+- `stale_dev_processes` keeps working without a listener table (no port associations, `process_kill` suggestions only) and says so in `notes`.
+- `host_stats` renders an explicit `GPU: not available` line (`gpuStatus: "unavailable"`) when `nvidia-smi` is absent instead of silently omitting the GPU row.
 
 ## [0.1.0] - 2026-11-08
 

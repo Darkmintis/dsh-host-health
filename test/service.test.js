@@ -87,6 +87,7 @@ test('hostStats assembles host fields, CPU deltas, top lists, highlights, and th
   assert.equal(value.disk?.freePercent, 40);
   assert.deepEqual(value.load, [1.5, 1.2, 1]);
   assert.equal(value.gpu.name, 'NVIDIA GeForce RTX 3060');
+  assert.equal(value.gpuStatus, 'available');
   assert.equal(value.warnings.length, 1);
   assert.equal(value.warnings[0].code, 'ram_high');
   assert.equal(value.thresholds.ramPercent, 85);
@@ -123,7 +124,16 @@ test('hostStats can skip processes and GPU', async () => {
   assert.deepEqual(value.topRam, []);
   assert.deepEqual(value.devProcesses, []);
   assert.equal(value.gpu, null);
+  assert.equal(value.gpuStatus, 'skipped');
   assert.equal(probes.calls.processTable, 0);
+});
+
+test('hostStats marks an unavailable GPU explicitly', async () => {
+  const { service } = createHarness({ processTables: [tableA, tableB] });
+  const value = await service.hostStats({ includeGpu: true });
+  assert.equal(value.ok, true);
+  assert.equal(value.gpu, null);
+  assert.equal(value.gpuStatus, 'unavailable');
 });
 
 test('hostStats forwards probe notes and survives a missing disk', async () => {
@@ -169,6 +179,8 @@ test('portsList lists listeners, joins names, and flags known and requested port
   });
   const value = await service.portsList({ ports: [3000] });
   assert.equal(value.ok, true);
+  assert.equal(value.available, true);
+  assert.equal(value.source, 'powershell');
   assert.deepEqual(value.listeners.map((listener) => listener.port), [3000, 5173, 8787]);
   assert.equal(value.listeners[0].name, 'python.exe');
   assert.equal(value.knownDevPorts.length, 5);
@@ -181,6 +193,25 @@ test('portsList lists listeners, joins names, and flags known and requested port
   const warningPorts = value.warnings.map((warning) => warning.message).join('\n');
   assert.match(warningPorts, /Port 5173/);
   assert.match(warningPorts, /Port 3000/);
+});
+
+test('portsList reports an unavailable listener probe instead of zero listeners', async () => {
+  const { service } = createHarness({
+    processTables: [tableA],
+    listeners: [
+      makeListenerSnapshot(START, [], { available: false, source: null }),
+    ],
+    probeNotes: ['listener_probe_unavailable: primary probe timed out; netstat fallback failed'],
+  });
+  const value = await service.portsList({ ports: [3000] });
+  assert.equal(value.ok, true);
+  assert.equal(value.available, false);
+  assert.equal(value.source, null);
+  assert.deepEqual(value.listeners, []);
+  assert.deepEqual(value.warnings, []);
+  assert.deepEqual(value.flagged.map((entry) => entry.status), Array(6).fill('unknown'));
+  assert.match(value.notes.join('\n'), /listener_probe_unavailable/);
+  assert.match(value.notes.join('\n'), /unavailable/);
 });
 
 test('portsList rejects invalid ports and unsupported platforms', async () => {
@@ -246,6 +277,7 @@ test('staleDevProcesses classifies leftover dev processes with suggested targets
   });
   const value = await service.staleDevProcesses();
   assert.equal(value.ok, true);
+  assert.equal(value.listenerProbeAvailable, true);
   assert.equal(value.count, 2);
   assert.equal(value.entries.some((entry) => entry.pid === 4242), false);
   const preview = value.entries.find((entry) => entry.pid === 100);
@@ -266,6 +298,75 @@ test('staleDevProcesses fails on unsupported platforms', async () => {
   const value = await service.staleDevProcesses();
   assert.equal(value.ok, false);
   assert.equal(value.error, 'unsupported_platform');
+});
+
+test('staleDevProcesses still works without a listener probe and says so', async () => {
+  const processes = [
+    makeProcess({
+      pid: 100,
+      name: 'node.exe',
+      startedAt: new Date(START - 2 * HOUR).toISOString(),
+      commandLine: 'node node_modules/vite/bin/vite.js',
+    }),
+  ];
+  const snapshot = makeProcessSnapshot(START, processes);
+  const second = makeProcessSnapshot(START + 100, processes);
+  const { service } = createHarness({
+    processTables: [snapshot, second],
+    listeners: [makeListenerSnapshot(START, [], { available: false, source: null })],
+    probeNotes: ['listener_probe_unavailable: both probes failed'],
+  });
+  const value = await service.staleDevProcesses();
+  assert.equal(value.ok, true);
+  assert.equal(value.listenerProbeAvailable, false);
+  assert.equal(value.entries[0].suggested.tool, 'process_kill');
+  assert.equal(value.entries[0].port, null);
+  assert.match(value.notes.join('\n'), /listener table is unavailable/);
+});
+
+test('portKill kills through a netstat-sourced listener table', async () => {
+  const table = makeProcessSnapshot(START, [makeProcess({ pid: 100, name: 'node.exe', startedAt: '2026-11-08T00:00:00Z' })]);
+  const first = makeListenerSnapshot(START, [{ address: '127.0.0.1', port: 5173, pid: 100 }], {
+    source: 'netstat',
+  });
+  const recheck = makeListenerSnapshot(START + 1, [{ address: '127.0.0.1', port: 5173, pid: 100 }], {
+    source: 'netstat',
+  });
+  const { service, control } = createHarness({
+    alive: [100],
+    processTables: [table],
+    listeners: [first, recheck],
+  });
+  const value = await service.portKill(5173);
+  assert.equal(value.ok, true);
+  assert.equal(value.listenerSource, 'netstat');
+  assert.equal(value.verifiedGone, true);
+  assert.equal(control.alive.has(100), false);
+});
+
+test('portKill refuses when the listener probe is unavailable', async () => {
+  const unavailable = makeListenerSnapshot(START, [], { available: false, source: null });
+  const { service, control } = createHarness({
+    alive: [100],
+    processTables: [tableA],
+    listeners: [unavailable, unavailable],
+  });
+  const value = await service.portKill(5173);
+  assert.equal(value.ok, false);
+  assert.equal(value.error, 'listener_probe_unavailable');
+  assert.match(value.hint, /Refusing to kill blind/);
+  assert.equal(control.alive.has(100), true);
+});
+
+test('portKill refuses when re-verification loses the listener probe', async () => {
+  const table = makeProcessSnapshot(START, [makeProcess({ pid: 100, name: 'node.exe' })]);
+  const first = makeListenerSnapshot(START, [{ address: '127.0.0.1', port: 5173, pid: 100 }]);
+  const lost = makeListenerSnapshot(START + 1, [], { available: false, source: null });
+  const { service, control } = createHarness({ alive: [100], processTables: [table], listeners: [first, lost] });
+  const value = await service.portKill(5173);
+  assert.equal(value.ok, false);
+  assert.equal(value.error, 'listener_probe_unavailable');
+  assert.equal(control.alive.has(100), true);
 });
 
 test('portKill kills the verified listener and reports verification', async () => {

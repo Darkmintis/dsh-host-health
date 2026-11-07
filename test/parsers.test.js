@@ -5,6 +5,7 @@ import {
   normalizeWindowsProcess,
   parseJsonOutput,
   parseLsofListeners,
+  parseNetstatListeners,
   parseNvidiaSmi,
   parsePsProcesses,
   parsePsTime,
@@ -118,6 +119,48 @@ test('parseSsListeners parses Linux ss -ltnpH output', () => {
   const noProcess = parsed.find((listener) => listener.port === 8000);
   assert.ok(noProcess);
   assert.equal(noProcess.pid, 0);
+});
+
+test('parseNetstatListeners parses LISTENING rows and ignores other states', () => {
+  const parsed = parseNetstatListeners(fixture('netstat-listeners.txt'));
+  assert.deepEqual(parsed.map((listener) => listener.port), [135, 135, 5173, 8000, 8787, 53365]);
+  const vite = parsed.find((listener) => listener.port === 5173);
+  assert.ok(vite);
+  assert.equal(vite.pid, 1234);
+  assert.equal(vite.address, '127.0.0.1');
+  const preview = parsed.find((listener) => listener.port === 8787);
+  assert.ok(preview);
+  assert.equal(preview.pid, 2345);
+  const ipv6 = parsed.find((listener) => listener.port === 135 && listener.address === '::');
+  assert.ok(ipv6);
+  assert.equal(ipv6.pid, 812);
+  assert.equal(parsed.some((listener) => listener.port === 5353), false);
+  assert.equal(parsed.filter((listener) => listener.port === 5173).length, 1);
+});
+
+test('parseNetstatListeners accepts localized state words via the zero foreign port', () => {
+  const parsed = parseNetstatListeners(
+    ['TCP    0.0.0.0:9000           0.0.0.0:0              ABHOEREN        777', 'TCP    0.0.0.0:9001   10.0.0.5:443   HERGESTELLT     778'].join('\r\n'),
+  );
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].port, 9000);
+  assert.equal(parsed[0].pid, 777);
+});
+
+test('parseNetstatListeners ignores headers, UDP, and malformed rows', () => {
+  assert.deepEqual(parseNetstatListeners(''), []);
+  assert.deepEqual(
+    parseNetstatListeners(
+      [
+        'Active Connections',
+        '  Proto  Local Address          Foreign Address        State           PID',
+        '  UDP    0.0.0.0:5353           *:*                                    900',
+        '  TCP    0.0.0.0:12345          0.0.0.0:0              LISTENING',
+        '  TCP    not-an-address         0.0.0.0:0              LISTENING       42',
+      ].join('\n'),
+    ),
+    [],
+  );
 });
 
 test('parseLsofListeners parses macOS lsof output', () => {

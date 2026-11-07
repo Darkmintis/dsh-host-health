@@ -206,6 +206,48 @@ test('kill tool arguments are normalized to numbers', async () => {
   assert.deepEqual(service.calls[1], ['processKill', 100, 'node']);
 });
 
+test('ports_list renderer reports an unavailable probe instead of zero listeners', () => {
+  const text = renderPortsList({
+    ok: true,
+    available: false,
+    source: null,
+    listeners: [],
+    flagged: [{ port: 5173, status: 'unknown', pid: null, name: null, knownDevPort: true, devLabel: 'Vite dev server' }],
+    warnings: [],
+    notes: ['ports_list listener_probe_unavailable: primary timed out; netstat fallback failed'],
+  });
+  assert.match(text, /TCP listeners: probe unavailable/);
+  assert.match(text, /not "0 listeners"/);
+  assert.match(text, /UNKNOWN \(listener probe unavailable\)/);
+  assert.doesNotMatch(text, /no TCP listeners visible/);
+  assert.match(text, /NOTE: ports_list listener_probe_unavailable/);
+});
+
+test('host_stats renderer shows an explicit GPU unavailable line and omits skipped GPU', () => {
+  const base = {
+    ok: true,
+    host: { hostname: 'dev-box', platform: 'win32', arch: 'x64', cpuCount: 8, uptimeSeconds: 60 },
+    memory: { totalBytes: 16 * 1024 ** 3, freeBytes: 8 * 1024 ** 3, usedBytes: 8 * 1024 ** 3, usedPercent: 50 },
+    cpu: { percent: 10 },
+    disk: null,
+    topRam: [],
+    topCpu: [],
+    devProcesses: [],
+    warnings: [],
+    notes: [],
+  };
+  const unavailable = renderHostStats({ ...base, gpu: null, gpuStatus: 'unavailable' });
+  assert.match(unavailable, /GPU: {2}not available \(nvidia-smi not found or no supported GPU\)/);
+  const skipped = renderHostStats({ ...base, gpu: null, gpuStatus: 'skipped' });
+  assert.doesNotMatch(skipped, /GPU:/);
+  const present = renderHostStats({
+    ...base,
+    gpu: { name: 'NVIDIA GeForce RTX 3060', vramTotalMb: 12288, vramUsedMb: 4096, utilizationPercent: 37 },
+    gpuStatus: 'available',
+  });
+  assert.match(present, /GPU: {2}NVIDIA GeForce RTX 3060 - 4096\.0\/12288\.0 MB VRAM, 37\.0% util/);
+});
+
 test('renderers tolerate partial payloads', () => {
   assert.match(renderHostStats({ ok: true }), /Host: unknown/);
   assert.match(renderPortsList({ ok: true }), /TCP listeners: 0/);

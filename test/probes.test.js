@@ -118,10 +118,67 @@ test('Windows listener probe parses and caches listeners', async () => {
   const probes = createProbes({ commandRunner: runner, platform: 'win32' });
   const snapshot = await probes.listeners();
   assert.equal(snapshot.listeners.length, 4);
+  assert.equal(snapshot.available, true);
+  assert.equal(snapshot.source, 'powershell');
   assert.deepEqual(snapshot.listeners.map((listener) => listener.port), [5173, 5554, 8787, 53365]);
   assert.match(runner.calls[0].args[3], /Get-NetTCPConnection/);
   await probes.listeners();
   assert.equal(runner.calls.length, 1);
+});
+
+test('listener probe falls back to netstat when Get-NetTCPConnection times out', async () => {
+  const runner = createFakeRunner({
+    pwsh: (command, args) =>
+      /Get-NetTCPConnection/.test(args[3])
+        ? failResult('TIMEOUT', 'probe timed out after 15000 ms')
+        : okResult(fixture('win-processes.json')),
+    netstat: okResult(fixture('netstat-listeners.txt')),
+  });
+  const probes = createProbes({ commandRunner: runner, platform: 'win32' });
+  const snapshot = await probes.listeners();
+  assert.equal(snapshot.available, true);
+  assert.equal(snapshot.source, 'netstat');
+  assert.equal(snapshot.listeners.length, 6);
+  assert.deepEqual(runner.calls.map((call) => call.command), ['pwsh', 'netstat']);
+  assert.deepEqual(runner.calls[1].args, ['-ano', '-p', 'tcp']);
+  const notes = probes.notes().join('\n');
+  assert.match(notes, /listener_probe_fallback/);
+  assert.match(notes, /Get-NetTCPConnection/);
+  assert.match(notes, /netstat/);
+  // The fallback becomes the preferred source: later fresh probes skip pwsh.
+  await probes.listeners({ fresh: true });
+  assert.deepEqual(runner.calls.map((call) => call.command), ['pwsh', 'netstat', 'netstat']);
+});
+
+test('listener probe reports both reasons and availability when primary and netstat fail', async () => {
+  const runner = createFakeRunner({
+    pwsh: failResult('TIMEOUT', 'probe timed out after 15000 ms'),
+    netstat: failResult('EXIT_CODE', 'probe exited with code 1'),
+  });
+  const probes = createProbes({ commandRunner: runner, platform: 'win32' });
+  const snapshot = await probes.listeners();
+  assert.equal(snapshot.available, false);
+  assert.equal(snapshot.source, null);
+  assert.deepEqual(snapshot.listeners, []);
+  const notes = probes.notes().join('\n');
+  assert.match(notes, /listener_probe_unavailable/);
+  assert.match(notes, /Get-NetTCPConnection|listener probe failed/);
+  assert.match(notes, /probe timed out after 15000 ms/);
+  assert.match(notes, /netstat fallback failed/);
+  assert.match(notes, /exited with code 1/);
+});
+
+test('non-Windows listener probe reports every failed candidate', async () => {
+  const runner = createFakeRunner({
+    ss: failResult('EXIT_CODE', 'ss failed'),
+    lsof: failResult('EXIT_CODE', 'lsof failed'),
+  });
+  const probes = createProbes({ commandRunner: runner, platform: 'linux' });
+  const snapshot = await probes.listeners();
+  assert.equal(snapshot.available, false);
+  const notes = probes.notes().join('\n');
+  assert.match(notes, /ss: ss failed/);
+  assert.match(notes, /lsof: lsof failed/);
 });
 
 test('Linux probes use ps, ss, and nvidia-smi directly', async () => {
