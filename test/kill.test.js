@@ -42,6 +42,8 @@ test('checkKillTarget accepts ordinary user processes', () => {
 test('processExists identifies the current process and invalid PIDs', () => {
   assert.equal(processExists(process.pid), true);
   assert.equal(processExists(-1), false);
+  assert.equal(processExists(0), false);
+  assert.equal(processExists(1.5), false);
 });
 
 test('createProcessControl exposes the host pid and a no-op-capable surface', () => {
