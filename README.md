@@ -94,13 +94,15 @@ workspace — chat, settings, and archives alike:
   92% RAM or when the Host API is unreachable. It also shows battery state when
   the host reports a battery.
 - Clicking it opens a modern, single-surface popover — fixed-positioned so the
-  header cannot clip it — with three headline cards (CPU, memory, primary disk),
-  per-core utilisation bars, every fixed volume with used/total, battery
-  charge/AC state, GPU status, committed memory, and compact top-CPU / top-RAM
-  process tables. Process tables show name, PID, RAM, and CPU only — never
-  command lines. Data is fetched when the plugin loads and refreshed every three
-  seconds, so the popover opens already populated instead of showing a loading
-  state.
+  header cannot clip it — with a **target switcher** (This PC plus every
+  connected Android device), headline CPU/memory cards, a colourful storage card
+  with every fixed volume, per-core bars, battery/AC state, GPU, committed
+  memory, and one **sortable process table** (Process · RAM · CPU · PID — click a
+  value column to flip highest/lowest). Process rows never show command lines.
+  Data is fetched when the plugin loads and refreshed every three seconds, so the
+  popover opens already populated instead of showing a loading state.
+- Choose a phone in the switcher to read that device's RAM, /data usage, CPU,
+  and battery without leaving the Harness.
 - Kill buttons ask for a browser confirmation, then call the same service methods
   as `port_kill` / `process_kill`, so identity re-verification and protected-PID
   refusals are identical. The panel requests go through the Host web server and

@@ -20,6 +20,13 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
+- The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
+  highest or lowest) instead of separate top-CPU and top-RAM tables, and a
+  **target switcher** that shows this PC or any connected Android device's RAM,
+  storage, CPU, and battery in place.
+
+### Changed
+
 - Redesigned the host-health dropdown as one modern surface: headline CPU /
   memory / disk cards, per-core bars, volume and battery rows, and compact
   process tables without command lines. The popover renders from prefetched
@@ -53,6 +60,13 @@ All notable changes to this project are documented in this file. The format is b
   every volume, battery/AC, per-core bars, and compact process tables without
   command lines. The collapsed pill shows CPU, RAM, battery, and device count —
   no disk storage.
+
+### Changed
+
+- The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
+  highest or lowest) instead of separate top-CPU and top-RAM tables, and a
+  **target switcher** that shows this PC or any connected Android device's RAM,
+  storage, CPU, and battery in place.
 
 ### Changed
 
@@ -98,6 +112,13 @@ Initial release. Package `@darkmintis/dsh-host-health`, a DeepSeek Harness profi
   every volume, battery/AC, per-core bars, and compact process tables without
   command lines. The collapsed pill shows CPU, RAM, battery, and device count —
   no disk storage.
+
+### Changed
+
+- The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
+  highest or lowest) instead of separate top-CPU and top-RAM tables, and a
+  **target switcher** that shows this PC or any connected Android device's RAM,
+  storage, CPU, and battery in place.
 
 ### Changed
 

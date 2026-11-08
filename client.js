@@ -486,32 +486,80 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Compact process table: name, PID, RAM, CPU. Never shows command lines.
-     * @param {{ title: string, processes: any[] }} props Table props.
+     * Merge the top-RAM and top-CPU lists into one de-duplicated process table
+     * sorted by the chosen column.
+     * @param {any[]} topCpu CPU-sorted processes.
+     * @param {any[]} topRam RAM-sorted processes.
+     * @returns {Array<Record<string, any>>} merged rows.
+     */
+    function mergeProcesses(topCpu, topRam) {
+      /** @type {Map<string, Record<string, any>>} */
+      const byPid = new Map();
+      for (const process of [...(Array.isArray(topCpu) ? topCpu : []), ...(Array.isArray(topRam) ? topRam : [])]) {
+        if (process === null || typeof process !== 'object') continue;
+        const key = String(process.pid ?? process.name ?? '');
+        if (key === '') continue;
+        const existing = byPid.get(key);
+        const ramMb = typeof process.ramMb === 'number' ? process.ramMb : existing?.ramMb ?? null;
+        const cpuPercent = typeof process.cpuPercent === 'number' ? process.cpuPercent : existing?.cpuPercent ?? null;
+        byPid.set(key, {
+          pid: process.pid ?? existing?.pid ?? null,
+          name: process.name ?? existing?.name ?? '?',
+          ramMb,
+          cpuPercent,
+        });
+      }
+      return [...byPid.values()];
+    }
+
+    /**
+     * One sortable process table: Process, RAM, CPU, PID. Clicking a value
+     * column toggles highest/lowest.
+     * @param {{ processes: any[], sortKey: string, sortDir: string, onSort: (key: string) => void }} props Table props.
      * @returns {any} table element.
      */
-    function DhProcessTable(props) {
-      const processes = Array.isArray(props.processes) ? props.processes.slice(0, 6) : [];
-      if (processes.length === 0) return null;
+    function DhProcesses(props) {
+      const rows = [...props.processes].sort((left, right) => {
+        const key = props.sortKey;
+        if (key === 'name') {
+          const result = String(left.name).localeCompare(String(right.name));
+          return props.sortDir === 'asc' ? result : -result;
+        }
+        const leftValue = typeof left[key] === 'number' ? left[key] : -1;
+        const rightValue = typeof right[key] === 'number' ? right[key] : -1;
+        return props.sortDir === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+      });
+      if (rows.length === 0) return null;
+      const arrow = (key) => (props.sortKey === key ? (props.sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+      const header = (label, key, left) =>
+        h(
+          'th',
+          {
+            key,
+            style: left === true ? { ...DH.thLeft, cursor: 'pointer', userSelect: 'none' } : { ...DH.th, cursor: 'pointer', userSelect: 'none' },
+            onClick: () => props.onSort(key),
+            title: `Sort by ${label.toLowerCase()}`,
+          },
+          `${label}${arrow(key)}`,
+        );
       return h(
         'div',
         { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-        h('span', { style: DH.label }, props.title),
         h(
           'table',
           { style: DH.table },
-          h('thead', null, h('tr', null, h('th', { style: DH.thLeft }, 'Process'), h('th', { style: DH.th }, 'PID'), h('th', { style: DH.th }, 'RAM'), h('th', { style: DH.th }, 'CPU'))),
+          h('thead', null, h('tr', null, header('Process', 'name', true), header('RAM', 'ramMb'), header('CPU', 'cpuPercent'), header('PID', 'pid'))),
           h(
             'tbody',
             null,
-            processes.map((process) =>
+            rows.slice(0, 8).map((process) =>
               h(
                 'tr',
-                { key: String(process.pid) },
+                { key: String(process.pid ?? process.name) },
                 h('td', { style: DH.tdLeft, title: String(process.name ?? '') }, String(process.name ?? '?')),
-                h('td', { style: DH.td }, String(process.pid ?? '?')),
                 h('td', { style: DH.td }, typeof process.ramMb === 'number' ? `${Math.round(process.ramMb)} MB` : '—'),
                 h('td', { style: DH.td }, typeof process.cpuPercent === 'number' ? `${process.cpuPercent.toFixed(1)}%` : '—'),
+                h('td', { style: DH.td }, String(process.pid ?? '?')),
               ),
             ),
           ),
@@ -520,14 +568,19 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The details surface: one glance at CPU, RAM, storage, battery, cores, and
-     * the busiest processes. Rendered from data the widget already holds, so it
-     * opens instantly instead of showing loading text.
+     * The details surface: a target switcher (this PC or any connected Android
+     * device), headline metrics, storage, battery, cores, and one sortable
+     * process table. Rendered from prefetched data, so it opens populated.
      * @param {Record<string, any>} props Surface props.
      * @returns {any} details element.
      */
     function HostDetails(props) {
+      const { useState } = React;
       const stats = props.stats;
+      const [target, setTarget] = useState('host');
+      const [sortKey, setSortKey] = useState('cpuPercent');
+      const [sortDir, setSortDir] = useState('desc');
+
       const host = stats !== null && typeof stats === 'object' ? stats.host ?? {} : {};
       const memory = stats !== null && typeof stats === 'object' ? stats.memory ?? {} : {};
       const cpu = stats !== null && typeof stats === 'object' ? stats.cpu ?? {} : {};
@@ -536,28 +589,146 @@ window.__ModuleLoader__.load({
       const gpu = stats !== null && typeof stats === 'object' && stats.gpu !== null && typeof stats.gpu === 'object' ? stats.gpu : null;
       const warnings = stats !== null && typeof stats === 'object' && Array.isArray(stats.warnings) ? stats.warnings : [];
       const mobiles = stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
+      const device = mobiles.find((entry) => String(entry.serial) === target) ?? null;
 
+      const toggleSort = (key) => {
+        if (key === sortKey) {
+          setSortDir((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+        } else {
+          setSortKey(key);
+          setSortDir(key === 'name' ? 'asc' : 'desc');
+        }
+      };
+
+      const chip = (label, id) => {
+        const active = target === id;
+        return h(
+          'button',
+          {
+            key: id,
+            type: 'button',
+            onClick: () => setTarget(id),
+            style: {
+              font: 'inherit',
+              fontSize: '11px',
+              padding: '3px 9px',
+              borderRadius: '999px',
+              border: `1px solid ${active ? HP.brand : HP.border1}`,
+              background: active ? HP.layer2 : 'transparent',
+              color: active ? HP.brand : HP.sub,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              fontWeight: active ? 700 : 500,
+            },
+          },
+          label,
+        );
+      };
+
+      const targets = h(
+        'div',
+        { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } },
+        chip('This PC', 'host'),
+        mobiles.map((entry) =>
+          chip(
+            entry.model !== undefined && entry.model !== null && String(entry.model) !== '' ? String(entry.model) : String(entry.serial),
+            String(entry.serial),
+          ),
+        ),
+      );
+
+      // Device view: the selected phone's RAM, storage, CPU, and battery.
+      if (device !== null) {
+        const deviceMemory = device.memory !== null && typeof device.memory === 'object' ? device.memory : null;
+        const deviceStorage = device.storage !== null && typeof device.storage === 'object' ? device.storage : null;
+        const deviceBattery = device.battery !== null && typeof device.battery === 'object' ? device.battery : null;
+        return h(
+          'div',
+          { style: { display: 'flex', flexDirection: 'column', gap: '9px', minWidth: 0 } },
+          targets,
+          h(
+            'div',
+            { style: DH.card },
+            h(
+              'div',
+              { style: DH.row },
+              h('span', { style: { fontSize: '13px', fontWeight: 700, color: HP.text } }, String(device.model ?? device.serial)),
+              h('span', { style: DH.sub }, String(device.serial)),
+              h(
+                'span',
+                { style: { ...DH.sub, marginLeft: 'auto' } },
+                `Android ${String(device.androidVersion ?? '?')}${typeof device.sdk === 'number' ? ` · SDK ${device.sdk}` : ''}`,
+              ),
+            ),
+            h(
+              'div',
+              { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' } },
+              deviceMemory !== null
+                ? h(DhMetric, { label: 'RAM', percent: deviceMemory.usedPercent, detail: `${hpBytes(deviceMemory.usedBytes)} of ${hpBytes(deviceMemory.totalBytes)}`, accent: HP.brand })
+                : h(DhMetric, { label: 'RAM', percent: 0, detail: 'unavailable' }),
+              deviceStorage !== null
+                ? h(DhMetric, { label: 'Storage', percent: deviceStorage.usedPercent, detail: `${hpBytes(deviceStorage.freeBytes)} free`, tone: dhTone(deviceStorage.usedPercent, 80, 93) })
+                : h(DhMetric, { label: 'Storage', percent: 0, detail: 'unavailable' }),
+              h(DhMetric, {
+                label: 'CPU',
+                percent: typeof device.cpuPercent === 'number' ? device.cpuPercent : 0,
+                detail: typeof device.cpuPercent === 'number' ? 'current load' : 'sample on next refresh',
+                accent: HP.brand,
+              }),
+            ),
+            h(
+              'div',
+              { style: DH.row },
+              h('span', { style: DH.rowLabel }, 'Battery'),
+              deviceBattery !== null
+                ? h(
+                    'span',
+                    { style: DH.pill(deviceBattery.charging === true ? HP.ok : HP.warn) },
+                    `${Math.round(Number(deviceBattery.percent) || 0)}% ${deviceBattery.charging === true ? '· charging' : '· on battery'}`,
+                  )
+                : h('span', { style: DH.sub }, 'unavailable'),
+              typeof deviceBattery?.temperatureC === 'number'
+                ? h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `${deviceBattery.temperatureC} °C`)
+                : null,
+            ),
+          ),
+          h('div', { style: { ...DH.sub, whiteSpace: 'normal' } }, 'Device memory, storage, and battery come from /proc/meminfo, df /data, and dumpsys battery. CPU is sampled from /proc/stat between refreshes.'),
+        );
+      }
+
+      // Host view
       const cpuPercent = typeof cpu.percent === 'number' ? cpu.percent : 0;
       const memPercent = typeof memory.usedPercent === 'number' ? memory.usedPercent : 0;
-      const primary = volumes.length > 0 ? volumes[0] : null;
-      const diskPercent = primary !== null && typeof primary.usedPercent === 'number' ? primary.usedPercent : 0;
       const perCore = Array.isArray(cpu.perCore) ? cpu.perCore.slice(0, 16) : [];
+      const processes = mergeProcesses(stats?.topCpu, stats?.topRam);
 
       return h(
         'div',
         { style: { display: 'flex', flexDirection: 'column', gap: '9px', minWidth: 0 } },
 
+        targets,
+
         h(
           'div',
           { style: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' } },
-          h(DhMetric, { label: 'CPU', percent: cpuPercent, detail: `${String(host.cpuCount ?? '?')} cores · ${perCore.length > 0 ? `${perCore.reduce((peak, core) => Math.max(peak, core.percent), 0).toFixed(0)}% peak core` : 'aggregate'}`, accent: HP.brand }),
+          h(DhMetric, {
+            label: 'CPU',
+            percent: cpuPercent,
+            detail: `${String(host.cpuCount ?? '?')} cores · ${perCore.length > 0 ? `${perCore.reduce((peak, core) => Math.max(peak, core.percent), 0).toFixed(0)}% peak core` : 'aggregate'}`,
+            accent: HP.brand,
+          }),
           h(DhMetric, { label: 'Memory', percent: memPercent, detail: `${hpBytes(memory.usedBytes)} of ${hpBytes(memory.totalBytes)}`, accent: HP.brand }),
         ),
 
         h(
           'div',
           { style: DH.card },
-          h('div', { style: DH.row }, h('span', { style: { ...DH.label, color: HP.brand } }, 'Storage'), h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, volumes.length > 0 ? `${volumes.length} volume${volumes.length === 1 ? '' : 's'}` : 'unavailable')),
+          h(
+            'div',
+            { style: DH.row },
+            h('span', { style: { ...DH.label, color: HP.brand } }, 'Storage'),
+            h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, volumes.length > 0 ? `${volumes.length} volume${volumes.length === 1 ? '' : 's'}` : 'unavailable'),
+          ),
           volumes.length === 0
             ? h('span', { style: DH.sub }, 'No volume data from the host probe.')
             : volumes.map((volume) =>
@@ -570,7 +741,7 @@ window.__ModuleLoader__.load({
                     h('span', { style: { ...DH.rowLabel, color: HP.text, fontWeight: 600 } }, String(volume.path)),
                     h('span', { style: DH.rowValue }, `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} · ${Number(volume.usedPercent ?? 0).toFixed(0)}%`),
                   ),
-                  h(DhBar, { percent: volume.usedPercent, tone: dhTone(volume.usedPercent, 80, 93), color: dhTone(volume.usedPercent, 80, 93) }),
+                  h(DhBar, { percent: volume.usedPercent, tone: dhTone(volume.usedPercent, 80, 93) }),
                 ),
               ),
         ),
@@ -602,13 +773,16 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { style: DH.card },
-
           battery !== null
             ? h(
                 'div',
                 { style: DH.row },
                 h('span', { style: DH.rowLabel }, 'Battery'),
-                h('span', { style: DH.pill(battery.charging === true ? HP.ok : dhTone(100 - (Number(battery.percent) || 0), 60, 30)) }, `${Math.round(Number(battery.percent) || 0)}% ${battery.charging === true ? '· charging' : '· on battery'}`),
+                h(
+                  'span',
+                  { style: DH.pill(battery.charging === true ? HP.ok : dhTone(100 - (Number(battery.percent) || 0), 60, 30)) },
+                  `${Math.round(Number(battery.percent) || 0)}% ${battery.charging === true ? '· charging' : '· on battery'}`,
+                ),
                 typeof battery.runtimeMinutes === 'number' ? h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `~${hpUptime(battery.runtimeMinutes * 60)} left`) : null,
               )
             : null,
@@ -630,67 +804,11 @@ window.__ModuleLoader__.load({
             : null,
         ),
 
-        mobiles.length > 0
-          ? h(
-              'div',
-              { style: DH.card },
-              h(
-                'div',
-                { style: DH.row },
-                h('span', { style: { ...DH.label, color: HP.brand } }, 'Devices'),
-                h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `${mobiles.length} connected over adb`),
-              ),
-              mobiles.map((device) =>
-                h(
-                  'div',
-                  { key: String(device.serial), style: { display: 'flex', flexDirection: 'column', gap: '5px', paddingTop: '5px', borderTop: `1px solid ${HP.border1}` } },
-                  h(
-                    'div',
-                    { style: DH.row },
-                    h('span', { style: { fontSize: '12px', fontWeight: 600, color: HP.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, String(device.model ?? device.serial)),
-                    h('span', { style: { ...DH.sub, color: HP.sub } }, String(device.serial)),
-                    h('span', { style: { flex: '1 1 auto' } }),
-                    device.battery !== null && typeof device.battery === 'object'
-                      ? h('span', { style: DH.pill(device.battery.charging === true ? HP.ok : HP.warn) }, `${Math.round(Number(device.battery.percent) || 0)}%${device.battery.charging === true ? ' ⚡' : ''}`)
-                      : null,
-                  ),
-                  device.memory !== null && typeof device.memory === 'object'
-                    ? h(
-                        'div',
-                        { style: DH.row },
-                        h('span', { style: DH.rowLabel }, 'RAM'),
-                        h(DhBar, { percent: device.memory.usedPercent, accent: HP.brand }),
-                        h('span', { style: DH.rowValue }, `${hpBytes(device.memory.usedBytes)} used`),
-                      )
-                    : null,
-                  device.storage !== null && typeof device.storage === 'object'
-                    ? h(
-                        'div',
-                        { style: DH.row },
-                        h('span', { style: DH.rowLabel }, 'Disk'),
-                        h(DhBar, { percent: device.storage.usedPercent, tone: dhTone(device.storage.usedPercent, 80, 93) }),
-                        h('span', { style: DH.rowValue }, `${hpBytes(device.storage.freeBytes)} free`),
-                      )
-                    : null,
-                  typeof device.cpuPercent === 'number'
-                    ? h(
-                        'div',
-                        { style: DH.row },
-                        h('span', { style: DH.rowLabel }, 'CPU'),
-                        h(DhBar, { percent: device.cpuPercent, accent: HP.brand }),
-                        h('span', { style: DH.rowValue }, `${device.cpuPercent.toFixed(1)}%`),
-                      )
-                    : null,
-                ),
-              ),
-            )
-          : null,
-
         h(
           'div',
           { style: DH.card },
-          h(DhProcessTable, { title: 'Top CPU', processes: stats?.topCpu }),
-          stats?.topRam !== undefined ? h('div', { style: { marginTop: '4px' } }, h(DhProcessTable, { title: 'Top RAM', processes: stats?.topRam })) : null,
+          h('div', { style: DH.row }, h('span', { style: { ...DH.label, color: HP.brand } }, 'Processes'), h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, 'click RAM / CPU to sort')),
+          h(DhProcesses, { processes, sortKey, sortDir, onSort: toggleSort }),
         ),
 
         warnings.length > 0
