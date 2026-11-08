@@ -91,7 +91,13 @@ workspace — chat, settings, and archives alike:
 ```
 
 - The strip refreshes every three seconds and turns amber at 80% RAM and red at
-  92% RAM or when the Host API is unreachable.
+  92% RAM or when the Host API is unreachable. It also shows battery state when
+  the host reports a battery.
+- The details popover reports Task-Manager-style numbers: **RAM used from
+  available memory** (with committed/commit-limit), **per-core CPU bars** and the
+  aggregate CPU counter, **every fixed volume** (C:, D:, …) with used/total,
+  battery charge + AC state, GPU status, uptime, process count, and top-RAM /
+  top-CPU process tables.
 - Clicking it opens a details popover — fixed-positioned so the header cannot clip it — with the Overview tab (RAM/CPU/disk bars,
   GPU, uptime, threshold warnings, top-RAM/top-CPU tables), the **Ports** tab
   (listeners, flagged dev ports, per-row **Kill**), and the **Stale processes**

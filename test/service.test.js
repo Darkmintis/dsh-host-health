@@ -31,6 +31,7 @@ function createHarness(overrides = {}) {
     processTables: overrides.processTables,
     listeners: overrides.listeners,
     gpu: overrides.gpu,
+    systemSnapshots: overrides.systemSnapshots,
   });
   if (overrides.probeNotes !== undefined) probes.notes = () => overrides.probeNotes;
   const system = createFakeSystem(overrides.system);
@@ -553,4 +554,44 @@ test('unsupported platforms fail closed for process-based tools', async () => {
   const stats = await service.hostStats({ includeGpu: false });
   assert.equal(stats.ok, true);
   assert.match(stats.notes.join('\n'), /platform "freebsd"/);
+});
+
+
+test('hostStats prefers the system snapshot for memory, cores, volumes, battery, and process count', async () => {
+  const { service } = createHarness({
+    processTables: [tableA, tableB],
+    systemSnapshots: [
+      {
+        memory: {
+          totalBytes: 16 * 1024 ** 3,
+          freeBytes: 8 * 1024 ** 3,
+          availableBytes: 8 * 1024 ** 3,
+          usedBytes: 8 * 1024 ** 3,
+          usedPercent: 50,
+          committedBytes: 9 * 1024 ** 3,
+          commitLimitBytes: 24 * 1024 ** 3,
+          cacheBytes: 2 * 1024 ** 3,
+        },
+        cpu: { totalPercent: 37, perCore: [{ index: 0, percent: 20 }, { index: 1, percent: 54 }] },
+        volumes: [
+          { path: 'C:', totalBytes: 500 * 1024 ** 3, freeBytes: 200 * 1024 ** 3, usedBytes: 300 * 1024 ** 3, usedPercent: 60, freePercent: 40 },
+          { path: 'D:', totalBytes: 100 * 1024 ** 3, freeBytes: 10 * 1024 ** 3, usedBytes: 90 * 1024 ** 3, usedPercent: 90, freePercent: 10 },
+        ],
+        battery: { percent: 85, charging: true, runtimeMinutes: null },
+        processCount: 321,
+      },
+    ],
+  });
+  const value = await service.hostStats({ includeGpu: false });
+  assert.equal(value.ok, true);
+  assert.equal(value.memory.usedPercent, 50);
+  assert.equal(value.memory.committedBytes, 9 * 1024 ** 3);
+  assert.equal(value.cpu.percent, 37);
+  assert.deepEqual(value.cpu.perCore, [{ index: 0, percent: 20 }, { index: 1, percent: 54 }]);
+  assert.equal(value.volumes.length, 2);
+  assert.equal(value.disk.path, 'C:');
+  assert.equal(value.disk.freePercent, 40);
+  assert.equal(value.battery.percent, 85);
+  assert.equal(value.battery.charging, true);
+  assert.equal(value.host.processCount, 321);
 });

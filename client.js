@@ -435,7 +435,7 @@ window.__ModuleLoader__.load({
         { style: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 } },
         h('div', { style: { fontWeight: 600, fontSize: HP_SMALL } }, props.title),
         processes.length === 0
-          ? h('div', { style: HP.sub }, 'no process data')
+          ? h('div', { style: { color: HP.sub } }, 'no process data')
           : h(
               'table',
               { style: HPP.table },
@@ -466,7 +466,7 @@ window.__ModuleLoader__.load({
      */
     function HpOverview(props) {
       const stats = props.stats;
-      if (stats === null) return h('div', { style: HP.sub }, 'Loading host stats…');
+      if (stats === null) return h('div', { style: { color: HP.sub } }, 'Loading host stats…');
       const host = stats.host ?? {};
       const memory = stats.memory ?? {};
       const cpu = stats.cpu ?? {};
@@ -479,11 +479,11 @@ window.__ModuleLoader__.load({
           'div',
           { style: HPP.card },
           h('div', { style: { fontWeight: 600 } }, `${host.hostname ?? 'host'} · ${host.platform ?? '?'} ${host.arch ?? ''}`),
-          h('div', { style: HP.sub }, `up ${hpUptime(host.uptimeSeconds)} · ${host.cpuCount ?? '?'} logical cores · plugin v${String(stats.pluginVersion ?? '?')}`),
+          h('div', { style: { color: HP.sub } }, `up ${hpUptime(host.uptimeSeconds)} · ${host.cpuCount ?? '?'} logical cores${typeof host.processCount === 'number' ? ` · ${host.processCount} processes` : ''} · plugin v${String(stats.pluginVersion ?? '?')}`),
           h(HpMetric, {
             label: 'RAM',
             percent: typeof memory.usedPercent === 'number' ? memory.usedPercent : 0,
-            detail: `${hpBytes(memory.usedBytes)} / ${hpBytes(memory.totalBytes)}`,
+            detail: `${hpBytes(memory.usedBytes)} / ${hpBytes(memory.totalBytes)}${typeof memory.committedBytes === 'number' ? ` · ${hpBytes(memory.committedBytes)} committed` : ''}`,
           }),
           h(HpMetric, { label: 'CPU', percent: typeof cpu.percent === 'number' ? cpu.percent : 0, detail: `${host.cpuCount ?? '?'} cores` }),
           h(HpMetric, {
@@ -491,9 +491,51 @@ window.__ModuleLoader__.load({
             percent: typeof disk.freePercent === 'number' ? 100 - disk.freePercent : 0,
             detail: `${hpBytes(disk.freeBytes)} free${typeof disk.path === 'string' ? ` on ${disk.path}` : ''}`,
           }),
+          Array.isArray(stats.cpu?.perCore) && stats.cpu.perCore.length > 0
+            ? h(
+                'div',
+                { style: { display: 'flex', gap: '2px', alignItems: 'flex-end', height: '26px', marginTop: '2px' } },
+                stats.cpu.perCore.slice(0, 32).map((core) =>
+                  h('div', {
+                    key: String(core.index),
+                    title: `Core ${core.index}: ${core.percent.toFixed(0)}%`,
+                    style: {
+                      flex: '1 1 0',
+                      minWidth: '3px',
+                      height: `${Math.max(8, Math.min(100, core.percent))}%`,
+                      background: core.percent >= 90 ? HP.err : core.percent >= 70 ? HP.warn : HP.ok,
+                      borderRadius: '2px',
+                    },
+                  }),
+                ),
+              )
+            : null,
+          Array.isArray(stats.volumes) && stats.volumes.length > 0
+            ? h(
+                'div',
+                { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' } },
+                stats.volumes.map((volume) =>
+                  h(HpMetric, {
+                    key: String(volume.path),
+                    label: `Disk ${String(volume.path)}`,
+                    percent: typeof volume.usedPercent === 'number' ? volume.usedPercent : 0,
+                    detail: `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} used`,
+                  }),
+                ),
+              )
+            : null,
+          stats.battery !== null && typeof stats.battery === 'object'
+            ? h(
+                'div',
+                { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '11.5px', color: HP.sub } },
+                h('span', { style: { color: HP.text, fontWeight: 600 } }, `Battery ${Math.round(Number(stats.battery.percent) || 0)}%`),
+                h('span', null, stats.battery.charging === true ? 'charging / on AC' : 'on battery'),
+                typeof stats.battery.runtimeMinutes === 'number' ? h('span', null, `· ~${hpUptime(stats.battery.runtimeMinutes * 60)} left`) : null,
+              )
+            : null,
           stats.gpuStatus === 'available' && stats.gpu !== null
-            ? h('div', { style: HP.sub }, `GPU: ${String(stats.gpu.name ?? 'GPU')}${typeof stats.gpu.utilizationPercent === 'number' ? ` · ${stats.gpu.utilizationPercent}%` : ''}${typeof stats.gpu.vramUsedMb === 'number' ? ` · ${stats.gpu.vramUsedMb}/${stats.gpu.vramTotalMb} MB VRAM` : ''}`)
-            : h('div', { style: HP.sub }, 'GPU: not available (nvidia-smi not found or no supported GPU)'),
+            ? h('div', { style: { color: HP.sub } }, `GPU: ${String(stats.gpu.name ?? 'GPU')}${typeof stats.gpu.utilizationPercent === 'number' ? ` · ${stats.gpu.utilizationPercent}%` : ''}${typeof stats.gpu.vramUsedMb === 'number' ? ` · ${stats.gpu.vramUsedMb}/${stats.gpu.vramTotalMb} MB VRAM` : ''}`)
+            : h('div', { style: { color: HP.sub } }, 'GPU: not available (nvidia-smi not found or no supported GPU)'),
           warnings.length > 0
             ? h(
                 'div',
@@ -519,7 +561,7 @@ window.__ModuleLoader__.load({
      */
     function HpPorts(props) {
       const ports = props.ports;
-      if (ports === null) return h('div', { style: HP.sub }, 'Reading listeners…');
+      if (ports === null) return h('div', { style: { color: HP.sub } }, 'Reading listeners…');
       const listeners = Array.isArray(ports.listeners) ? ports.listeners : [];
       const flagged = Array.isArray(ports.flagged) ? ports.flagged : [];
       return h(
@@ -531,7 +573,7 @@ window.__ModuleLoader__.load({
           { style: HPP.card },
           h('div', { style: { fontWeight: 600 } }, `TCP listeners${typeof ports.source === 'string' ? ` (${ports.source})` : ''}`),
           listeners.length === 0
-            ? h('div', { style: HP.sub }, 'No enumerable TCP listener.')
+            ? h('div', { style: { color: HP.sub } }, 'No enumerable TCP listener.')
             : h(
                 'table',
                 { style: HPP.table },
@@ -605,12 +647,12 @@ window.__ModuleLoader__.load({
      */
     function HpStale(props) {
       const stale = props.stale;
-      if (stale === null) return h('div', { style: HP.sub }, 'Scanning dev processes…');
+      if (stale === null) return h('div', { style: { color: HP.sub } }, 'Scanning dev processes…');
       const entries = Array.isArray(stale.entries) ? stale.entries : [];
       return h(
         'div',
         { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        h('div', { style: HP.sub }, `${entries.length} candidate(s) · stale threshold ${String(stale.staleAfterMinutes ?? '?')} min`),
+        h('div', { style: { color: HP.sub } }, `${entries.length} candidate(s) · stale threshold ${String(stale.staleAfterMinutes ?? '?')} min`),
         entries.length === 0
           ? h('div', { style: HPP.card }, 'No leftover dev servers, emulators, or Gradle daemons detected.')
           : entries.map((entry) => {
@@ -625,7 +667,7 @@ window.__ModuleLoader__.load({
                   { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                   h('span', { style: HPP.pill(entry.stale === true ? HP.warn : HP.sub) }, `${entry.stale === true ? 'STALE' : 'candidate'}/${String(entry.confidence ?? 'low')}`),
                   h('span', { style: { fontWeight: 600 } }, String(entry.label ?? entry.category ?? 'process')),
-                  h('span', { style: HP.sub }, `${String(entry.name ?? '?')} · pid ${String(entry.pid)}${typeof entry.port === 'number' ? ` · port ${entry.port}` : ''}${typeof entry.ageMinutes === 'number' ? ` · ${Math.round(entry.ageMinutes)} min` : ''}`),
+                  h('span', { style: { color: HP.sub } }, `${String(entry.name ?? '?')} · pid ${String(entry.pid)}${typeof entry.port === 'number' ? ` · port ${entry.port}` : ''}${typeof entry.ageMinutes === 'number' ? ` · ${Math.round(entry.ageMinutes)} min` : ''}`),
                   h('span', { style: { flex: '1 1 auto' } }),
                   target !== undefined
                     ? h(
@@ -640,8 +682,8 @@ window.__ModuleLoader__.load({
                       )
                     : null,
                 ),
-                h('div', { style: { ...HP.sub, fontSize: HP_SMALL } }, String(entry.reason ?? '')),
-                suggested !== undefined ? h('div', { style: { ...HP.sub, fontSize: HP_SMALL, ...HPP.mono } }, `next: ${String(suggested.tool)}(${JSON.stringify(suggested.args ?? {})})`) : null,
+                h('div', { style: { color: HP.sub, fontSize: HP_SMALL } }, String(entry.reason ?? '')),
+                suggested !== undefined ? h('div', { style: { color: HP.sub, fontSize: HP_SMALL, ...HPP.mono } }, `next: ${String(suggested.tool)}(${JSON.stringify(suggested.args ?? {})})`) : null,
               );
             }),
       );
@@ -903,11 +945,17 @@ window.__ModuleLoader__.load({
       const cpuPercent = cpu !== null && typeof cpu === 'object' && typeof cpu.percent === 'number' ? cpu.percent : null;
       const memPercent = memory !== null && typeof memory === 'object' && typeof memory.usedPercent === 'number' ? memory.usedPercent : null;
       const diskFree = disk !== null && typeof disk === 'object' && typeof disk.freeBytes === 'number' ? disk.freeBytes : null;
+      const battery =
+        stats !== null && typeof stats === 'object' && stats.battery !== null && typeof stats.battery === 'object'
+          ? stats.battery
+          : null;
+      const batteryPercent = battery !== null && typeof battery.percent === 'number' ? battery.percent : null;
 
       const parts = [];
       if (cpuPercent !== null) parts.push(`CPU ${cpuPercent.toFixed(0)}%`);
       if (memPercent !== null) parts.push(`RAM ${memPercent.toFixed(0)}%`);
       if (diskFree !== null) parts.push(`${hpBytes(diskFree)} free`);
+      if (batteryPercent !== null) parts.push(`${battery.charging === true ? 'AC' : 'BAT'} ${batteryPercent.toFixed(0)}%`);
       if (error !== null) parts.push('offline');
 
       const tone = error !== null ? HP.err : memPercent !== null && memPercent >= 92 ? HP.err : memPercent !== null && memPercent >= 80 ? HP.warn : HP.ok;

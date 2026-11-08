@@ -10,6 +10,7 @@ import {
   parsePsProcesses,
   parsePsTime,
   parseSsListeners,
+  parseSystemSnapshot,
   parseWindowsListeners,
   parseWindowsProcesses,
 } from '../lib/parsers.js';
@@ -181,4 +182,59 @@ test('parseNvidiaSmi parses the query-gpu CSV fixture', () => {
   assert.equal(gpu.utilizationPercent, 37);
   assert.equal(parseNvidiaSmi(''), null);
   assert.equal(parseNvidiaSmi('garbage'), null);
+});
+
+
+test('parseSystemSnapshot reads Task-Manager memory, cores, volumes, and battery', () => {
+  const snapshot = parseSystemSnapshot(
+    JSON.stringify({
+      totalBytes: 16_000_000_000,
+      freeBytes: 4_000_000_000,
+      availableBytes: 5_000_000_000,
+      committedBytes: 9_000_000_000,
+      commitLimitBytes: 20_000_000_000,
+      cacheBytes: 2_000_000_000,
+      processCount: 321,
+      cores: [
+        { name: '_Total', percent: 42 },
+        { name: '1', percent: 10 },
+        { name: '0', percent: 90 },
+      ],
+      volumes: [
+        { path: 'C:', total: 500_000_000_000, free: 200_000_000_000 },
+        { path: 'D:', total: 100_000_000_000, free: 0 },
+      ],
+      battery: { percent: 85, status: 2, runtimeMinutes: 0 },
+    }),
+  );
+  assert.ok(snapshot);
+  assert.equal(snapshot.memory.totalBytes, 16_000_000_000);
+  assert.equal(snapshot.memory.freeBytes, 5_000_000_000, 'available memory wins over free memory');
+  assert.equal(snapshot.memory.usedBytes, 11_000_000_000);
+  assert.equal(snapshot.memory.usedPercent, 68.8);
+  assert.equal(snapshot.memory.committedBytes, 9_000_000_000);
+  assert.equal(snapshot.cpu.totalPercent, 42);
+  assert.deepEqual(snapshot.cpu.perCore, [
+    { index: 0, percent: 90 },
+    { index: 1, percent: 10 },
+  ]);
+  assert.equal(snapshot.volumes.length, 2);
+  assert.equal(snapshot.volumes[0].freePercent, 40);
+  assert.equal(snapshot.volumes[0].usedPercent, 60);
+  assert.equal(snapshot.volumes[1].freePercent, 0);
+  assert.equal(snapshot.battery.percent, 85);
+  assert.equal(snapshot.battery.charging, true, 'BatteryStatus 2 means on AC');
+  assert.equal(snapshot.battery.runtimeMinutes, null, 'unknown runtime is dropped');
+  assert.equal(snapshot.processCount, 321);
+});
+
+test('parseSystemSnapshot tolerates partial and malformed output', () => {
+  assert.equal(parseSystemSnapshot(''), null);
+  assert.equal(parseSystemSnapshot('not json'), null);
+  const partial = parseSystemSnapshot(JSON.stringify({ totalBytes: 0, cores: 'nope', volumes: [{ path: '', total: 0 }], battery: { percent: 'x' } }));
+  assert.ok(partial);
+  assert.equal(partial.memory, null);
+  assert.deepEqual(partial.cpu.perCore, []);
+  assert.deepEqual(partial.volumes, []);
+  assert.equal(partial.battery, null);
 });

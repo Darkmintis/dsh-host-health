@@ -105,10 +105,12 @@ export function createFakeProbes(options = {}) {
   const processTables = options.processTables ?? [makeProcessSnapshot(1_000_000, [])];
   const listenerSnapshots = options.listeners ?? [makeListenerSnapshot(1_000_000, [])];
   const gpuValues = options.gpu ?? [null];
+  const systemSnapshots = options.systemSnapshots ?? [null];
   const processTableSeq = sequence(processTables);
   const listenerSeq = sequence(listenerSnapshots);
   const gpuSeq = sequence(gpuValues);
-  const calls = { processTable: 0, listeners: 0, gpu: 0, freshProcessTable: 0, freshListeners: 0 };
+  const systemSeq = sequence(systemSnapshots);
+  const calls = { processTable: 0, listeners: 0, gpu: 0, systemSnapshot: 0, freshProcessTable: 0, freshListeners: 0 };
   return {
     calls,
     async processTable(probeOptions = {}) {
@@ -124,6 +126,10 @@ export function createFakeProbes(options = {}) {
     async gpu() {
       calls.gpu += 1;
       return gpuSeq();
+    },
+    async systemSnapshot() {
+      calls.systemSnapshot += 1;
+      return systemSeq();
     },
     clearNotes() {},
     clearCache() {},

@@ -19,6 +19,14 @@ All notable changes to this project are documented in this file. The format is b
 - Panel API tests: unauthenticated rejection, structured payloads, port/pid kill
   routing, invalid-target refusal, and error shapes.
 
+### Added
+
+- **Task-Manager-grade `host_stats`**: memory now reports available/committed/
+  commit-limit/cache bytes, CPU reports the aggregate counter plus per-core
+  utilisation, and the snapshot adds every fixed volume, battery charge/AC state,
+  and the process count. Overflow-friendly text rendering and dropdown UI
+  (per-core bars, per-volume bars, battery line).
+
 ### Fixed
 
 - **Desktop panel API**: the usage strip now resolves its API calls against the page origin. The desktop window runs at `dsh-app://app` and forwards page-relative requests to the Host with its authentication cookie; targeting the loopback HTTP origin directly was cross-origin and left the strip offline.

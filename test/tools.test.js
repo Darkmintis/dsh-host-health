@@ -253,6 +253,35 @@ test('host_stats renderer shows an explicit GPU unavailable line and omits skipp
   assert.match(present, /GPU: {2}NVIDIA GeForce RTX 3060 - 4096\.0\/12288\.0 MB VRAM, 37\.0% util/);
 });
 
+test('host_stats text shows committed memory, per-core CPU, volumes, and battery', () => {
+  const text = renderHostStats({
+    ok: true,
+    host: { hostname: 'dev-box', platform: 'win32', arch: 'x64', cpuCount: 8, uptimeSeconds: 7200, processCount: 321 },
+    memory: { totalBytes: 16 * 1024 ** 3, freeBytes: 8 * 1024 ** 3, availableBytes: 8 * 1024 ** 3, usedBytes: 8 * 1024 ** 3, usedPercent: 50, committedBytes: 9 * 1024 ** 3, commitLimitBytes: 24 * 1024 ** 3, cacheBytes: 2 * 1024 ** 3 },
+    cpu: { percent: 37, perCore: [{ index: 0, percent: 20 }, { index: 1, percent: 54 }] },
+    disk: { path: 'C:\\', totalBytes: 500 * 1024 ** 3, freeBytes: 200 * 1024 ** 3, usedBytes: 300 * 1024 ** 3, freePercent: 40 },
+    volumes: [
+      { path: 'C:', totalBytes: 500 * 1024 ** 3, freeBytes: 200 * 1024 ** 3, usedBytes: 300 * 1024 ** 3, usedPercent: 60, freePercent: 40 },
+      { path: 'D:', totalBytes: 100 * 1024 ** 3, freeBytes: 10 * 1024 ** 3, usedBytes: 90 * 1024 ** 3, usedPercent: 90, freePercent: 10 },
+    ],
+    battery: { percent: 85, charging: true, runtimeMinutes: null },
+    load: null,
+    gpu: null,
+    gpuStatus: 'skipped',
+    topRam: [],
+    topCpu: [],
+    devProcesses: [],
+    warnings: [],
+    notes: [],
+  });
+  assert.match(text, /Commit: 9\.0 GB \/ 24\.0 GB limit/);
+  assert.match(text, /Cores: 20\.0, 54\.0/);
+  assert.match(text, /Battery: 85\.0% \(charging \/ on AC\)/);
+  assert.match(text, /Volumes/);
+  assert.match(text, /C: {3}\s+/);
+  assert.match(text, /D: {3}\s+/);
+});
+
 test('renderers tolerate partial payloads', () => {
   assert.match(renderHostStats({ ok: true }), /Host: unknown/);
   assert.match(renderPortsList({ ok: true }), /TCP listeners: 0/);
