@@ -247,5 +247,11 @@ export function createFakeReact() {
       return [typeof initial === 'function' ? initial() : initial, () => {}];
     },
     useEffect() {},
+    useCallback(fn) {
+      return fn;
+    },
+    useRef(initial) {
+      return { current: initial };
+    },
   };
 }

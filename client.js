@@ -315,7 +315,13 @@ window.__ModuleLoader__.load({
      * @returns {string} absolute URL.
      */
     function hpApiUrl(endpoint) {
-      return new URL(API_PREFIX + endpoint, document.baseURI).href;
+      const transport = typeof window === 'object' && window !== null ? window.__DSH_TRANSPORT__ : undefined;
+      const streamBaseUrl =
+        transport !== null && typeof transport === 'object' && typeof transport.streamBaseUrl === 'string' && transport.streamBaseUrl !== ''
+          ? transport.streamBaseUrl
+          : undefined;
+      const base = streamBaseUrl ?? document.baseURI;
+      return new URL(API_PREFIX + endpoint, base).href;
     }
 
     /**
@@ -331,10 +337,12 @@ window.__ModuleLoader__.load({
         headers: options.body === undefined ? undefined : { 'content-type': 'application/json' },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
-      if (response.status === 401 || response.status === 403) throw new Error('This page is not authorized against the Host. Reload the Web UI.');
       const payload = await response.json().catch(() => null);
-      if (payload === null) throw new Error(`Host returned ${response.status} without JSON.`);
-      if (payload.ok === false) throw new Error(typeof payload.error === 'string' ? payload.error : 'Host request failed.');
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Host API ${response.status}: not authorized for this page`);
+      }
+      if (payload === null) throw new Error(`Host API ${response.status}: no JSON body`);
+      if (payload.ok === false) throw new Error(typeof payload.error === 'string' ? payload.error : `Host API ${response.status}`);
       return payload;
     }
 
@@ -772,6 +780,159 @@ window.__ModuleLoader__.load({
       );
     }
 
+    // ------------------------------------------------------------------
+    // App-bar usage strip: compact RAM/CPU/disk readout + details popover
+    // ------------------------------------------------------------------
+
+    /** Strip typography and chrome. */
+    const STRIP = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      height: '26px',
+      padding: '0 9px',
+      borderRadius: '999px',
+      border: `1px solid ${HP.border1}`,
+      background: HP.layer1,
+      color: HP.sub,
+      font: 'inherit',
+      fontSize: '11.5px',
+      lineHeight: 1,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    };
+    const STRIP_DOT = (tone) => ({ width: '6px', height: '6px', borderRadius: '50%', background: tone, flex: 'none' });
+    const POPOVER = {
+      position: 'absolute',
+      top: 'calc(100% + 8px)',
+      left: 0,
+      zIndex: 1000,
+      width: 'min(430px, 92vw)',
+      maxHeight: '74vh',
+      overflow: 'auto',
+      padding: '10px',
+      borderRadius: '10px',
+      border: `1px solid ${HP.border2}`,
+      background: HP.layer1,
+    };
+
+    /**
+     * Compact usage strip: one glance gives CPU, RAM, and free disk; a click
+     * opens the full details popover (overview, ports, stale processes).
+     * @returns {any} strip element.
+     */
+    function HostUsageWidget() {
+      const { useState, useEffect, useCallback, useRef } = React;
+      const [stats, setStats] = useState(null);
+      const [error, setError] = useState(null);
+      const [open, setOpen] = useState(false);
+      const rootRef = useRef(null);
+
+      const load = useCallback(async () => {
+        try {
+          const payload = await hpFetchJson(hpApiUrl('stats'));
+          setStats(payload.value ?? null);
+          setError(null);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      }, []);
+
+      useEffect(() => {
+        load();
+        const timer = setInterval(load, 3_000);
+        return () => clearInterval(timer);
+      }, [load]);
+
+      useEffect(() => {
+        if (!open) return undefined;
+        const onPointerDown = (event) => {
+          const node = rootRef.current;
+          const target = event.target;
+          if (node !== null && target instanceof Node && !node.contains(target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onPointerDown);
+        return () => document.removeEventListener('mousedown', onPointerDown);
+      }, [open]);
+
+      const host = stats !== null && typeof stats === 'object' ? stats.host ?? null : null;
+      const memory = stats !== null && typeof stats === 'object' ? stats.memory ?? null : null;
+      const cpu = stats !== null && typeof stats === 'object' ? stats.cpu ?? null : null;
+      const disk = stats !== null && typeof stats === 'object' ? stats.disk ?? null : null;
+
+      const cpuPercent = cpu !== null && typeof cpu === 'object' && typeof cpu.percent === 'number' ? cpu.percent : null;
+      const memPercent = memory !== null && typeof memory === 'object' && typeof memory.usedPercent === 'number' ? memory.usedPercent : null;
+      const diskFree = disk !== null && typeof disk === 'object' && typeof disk.freeBytes === 'number' ? disk.freeBytes : null;
+
+      const parts = [];
+      if (cpuPercent !== null) parts.push(`CPU ${cpuPercent.toFixed(0)}%`);
+      if (memPercent !== null) parts.push(`RAM ${memPercent.toFixed(0)}%`);
+      if (diskFree !== null) parts.push(`${hpBytes(diskFree)} free`);
+      if (error !== null) parts.push('offline');
+
+      const tone = error !== null ? HP.err : memPercent !== null && memPercent >= 92 ? HP.err : memPercent !== null && memPercent >= 80 ? HP.warn : HP.ok;
+      const label = parts.length > 0 ? parts.join(' · ') : 'Host …';
+      const uptime = host !== null && typeof host === 'object' ? hpUptime(host.uptimeSeconds) : '—';
+      const hostName = host !== null && typeof host === 'object' && typeof host.hostname === 'string' ? host.hostname : 'host';
+
+      return h(
+        'div',
+        { ref: rootRef, style: { position: 'relative', display: 'inline-flex' }, 'data-host-health-strip': 'app-bar' },
+        h(
+          'button',
+          {
+            type: 'button',
+            style: STRIP,
+            title: error ?? `${hostName} · up ${uptime}`,
+            'aria-expanded': open ? 'true' : 'false',
+            onClick: () => setOpen((current) => !current),
+          },
+          h('span', { style: STRIP_DOT(tone), 'aria-hidden': true }),
+          h('span', null, label),
+          h(
+            'svg',
+            {
+              width: 10,
+              height: 10,
+              viewBox: '0 0 24 24',
+              fill: 'none',
+              stroke: 'currentColor',
+              strokeWidth: 2.6,
+              strokeLinecap: 'round',
+              strokeLinejoin: 'round',
+              'aria-hidden': true,
+              style: { transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' },
+            },
+            h('path', { d: 'M6 9l6 6 6-6' }),
+          ),
+        ),
+        open
+          ? h(
+              'div',
+              { style: POPOVER, 'data-host-health-popover': 'open' },
+              h(
+                'div',
+                { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
+                h('span', { style: { fontWeight: 600, fontSize: '13px', color: HP.text } }, 'Host health'),
+                h('span', { style: { color: HP.sub, fontSize: '11.5px' } }, `${hostName} · up ${uptime}`),
+                h('span', { style: { flex: '1 1 auto' } }),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: { ...HPP.button, padding: '2px 7px' },
+                    onClick: () => setOpen(false),
+                    'aria-label': 'Close host health details',
+                  },
+                  'Close',
+                ),
+              ),
+              h(HostHealthPanel, {}),
+            )
+          : null,
+      );
+    }
+
     const cards = ['host_stats', 'ports_list', 'stale_dev_processes', 'port_kill', 'process_kill'];
 
     return {
@@ -790,15 +951,12 @@ window.__ModuleLoader__.load({
         } catch {
           // Locale is optional; the cards keep their English fallbacks.
         }
-        // Visible cockpit: a main-column panel plus the sidebar entry that
-        // addresses it by the same id.
-        ctx.slots.inject('sidebar.panellist', () =>
-          ctx.slots.register(
-            { name: 'sidebar.panellist', id: PANEL_ID, order: 20, label: 'Host health' },
-            HostHealthIcon,
-          ),
+        // Compact app-bar usage strip: the leading seat is always visible, so
+        // RAM/CPU/disk stay one glance away. Clicking it opens the details
+        // popover; the full numbers live there instead of a separate panel.
+        ctx.slots.inject('conversation.header.leading', () =>
+          ctx.slots.register({ name: 'conversation.header.leading' }, HostUsageWidget),
         );
-        ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, HostHealthPanel));
 
         for (const key of cards) {
           ctx.slots.inject('tool.call.toolview', () =>

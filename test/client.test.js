@@ -108,12 +108,10 @@ test('client module declares the expected id and read-only card registrations', 
   const { registrations, injectedSlots } = installClient(module);
   const cards = registrations.filter((registration) => registration.options.name === 'tool.call.toolview');
   assert.equal(cards.length, 5);
-  assert.deepEqual([...injectedSlots].sort(), ['main', 'sidebar.panellist', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
-  const main = registrations.find((registration) => registration.options.name === 'main');
-  assert.equal(main?.options.key, 'host-health', 'main panel key matches the panel id');
-  const sidebar = registrations.find((registration) => registration.options.name === 'sidebar.panellist');
-  assert.equal(sidebar?.options.id, 'host-health', 'sidebar entry addresses the main panel');
-  assert.equal(typeof sidebar?.component, 'function');
+  assert.deepEqual([...injectedSlots].sort(), ['conversation.header.leading', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
+  const strip = registrations.find((registration) => registration.options.name === 'conversation.header.leading');
+  assert.equal(typeof strip?.component, 'function', 'the always-visible app-bar strip is registered');
+  assert.equal(registrations.filter((registration) => registration.options.name === 'main').length, 0, 'no separate main panel is registered');
   const keys = cards.map((registration) => registration.options.key);
   assert.deepEqual(keys, ['host_stats', 'ports_list', 'stale_dev_processes', 'port_kill', 'process_kill']);
   for (const registration of cards) {
@@ -121,6 +119,19 @@ test('client module declares the expected id and read-only card registrations', 
     assert.equal(registration.options.locale, 'host-health');
     assert.equal(typeof registration.component, 'function');
   }
+});
+
+test('the app-bar strip renders a compact usage readout without throwing', () => {
+  const module = loadClientModule().factory(() => createFakeReact());
+  const { registrations } = installClient(module);
+  const strip = registrations.find((registration) => registration.options.name === 'conversation.header.leading');
+  assert.ok(strip, 'strip registration exists');
+  let tree;
+  assert.doesNotThrow(() => {
+    tree = strip.component({});
+  });
+  assert.equal(tree.props['data-host-health-strip'], 'app-bar');
+  assert.equal(treeContains(tree, 'Host'), true, 'loading label is shown before the first sample');
 });
 
 test('card components never throw on missing or malformed props', () => {

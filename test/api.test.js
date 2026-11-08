@@ -111,7 +111,7 @@ function jsonBody(res) {
 test('panel API rejects an unauthenticated request before probing', async () => {
   const { call } = makeApi(makeService(), { reject: 401 });
   const res = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}stats` }), res);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/stats` }), res);
   assert.equal(res.statusCode, 401);
   assert.equal(res.ended, true);
   assert.equal(res.body, undefined);
@@ -120,7 +120,7 @@ test('panel API rejects an unauthenticated request before probing', async () => 
 test('GET stats returns structured host data, rendered text, and plugin version', async () => {
   const { call } = makeApi(makeService());
   const res = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}stats` }), res);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/stats` }), res);
   const payload = jsonBody(res);
   assert.equal(payload.ok, true);
   assert.equal(payload.pluginVersion, '0.1.0');
@@ -162,13 +162,13 @@ test('GET ports and stale endpoints pass through the service values', async () =
   const { call } = makeApi(service);
 
   const ports = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}ports` }), ports);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/ports` }), ports);
   const portsPayload = jsonBody(ports);
   assert.equal(portsPayload.value.listeners[0].port, 5173);
   assert.match(String(portsPayload.text), /5173/u);
 
   const stale = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}stale` }), stale);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/stale` }), stale);
   const stalePayload = jsonBody(stale);
   assert.equal(stalePayload.value.entries[0].stale, true);
   assert.match(String(stalePayload.text), /STALE/u);
@@ -180,7 +180,7 @@ test('POST kill routes a port target through portKill', async () => {
   const service = makeService({ portKill: async (port) => { ports.push(port); return { ok: true, killed: { port, pid: 100, name: 'node.exe' }, verifiedGone: true }; } });
   const { call } = makeApi(service);
   const res = makeRes();
-  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}kill`, body: { port: 5173 } }), res);
+  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}/kill`, body: { port: 5173 } }), res);
   const payload = jsonBody(res);
   assert.deepEqual(ports, [5173]);
   assert.equal(payload.ok, true);
@@ -199,7 +199,7 @@ test('POST kill routes a pid target through processKill with the expected name',
   });
   const { call } = makeApi(service);
   const res = makeRes();
-  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}kill`, body: { pid: 4242, expectedName: 'node.exe' } }), res);
+  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}/kill`, body: { pid: 4242, expectedName: 'node.exe' } }), res);
   assert.deepEqual(calls, [[4242, 'node.exe']]);
   assert.equal(jsonBody(res).ok, true);
 });
@@ -207,29 +207,29 @@ test('POST kill routes a pid target through processKill with the expected name',
 test('POST kill rejects a body with no valid target', async () => {
   const { call } = makeApi(makeService());
   const res = makeRes();
-  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}kill`, body: { port: 0 } }), res);
+  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}/kill`, body: { port: 0 } }), res);
   assert.match(String(jsonBody(res).error), /integer port/u);
 
   const bad = makeRes();
-  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}kill`, body: ['nope'] }), bad);
+  await call(makeReq({ method: 'POST', url: `${HOST_HEALTH_API_PREFIX}/kill`, body: ['nope'] }), bad);
   assert.match(String(jsonBody(bad).error), /JSON object/u);
 });
 
 test('unknown endpoints and GET kill answer with a clear error', async () => {
   const { call } = makeApi(makeService());
   const missing = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}nope` }), missing);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/nope` }), missing);
   assert.equal(missing.statusCode, 404);
   assert.match(String(jsonBody(missing).error), /unknown host-health api endpoint/u);
 
   const getKill = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}kill` }), getKill);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/kill` }), getKill);
   assert.equal(getKill.statusCode, 404);
 });
 
 test('GET version reports the running Host generation', async () => {
   const { call } = makeApi(makeService());
   const res = makeRes();
-  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}version` }), res);
+  await call(makeReq({ url: `${HOST_HEALTH_API_PREFIX}/version` }), res);
   assert.deepEqual(jsonBody(res), { ok: true, pluginVersion: '0.1.0' });
 });

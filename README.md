@@ -81,22 +81,25 @@ These paths are placeholders; add the real captures before the first tagged rele
 
 ## Visual panel
 
-Installing the bundle also adds a **Host health** section to the Web UI: a
-sidebar icon and a main-column panel with live host numbers.
+Installing the bundle also adds a compact **usage strip to the app bar** (the
+conversation header, always visible next to the session title):
 
-- **Overview** — RAM, CPU, and disk bars, host uptime/cores, GPU status, threshold
-  warnings, and top-RAM/top-CPU tables. It refreshes every few seconds only while
-  the panel is open.
-- **Ports** — TCP listeners with PID and process name, flagged known dev ports,
-  and a per-row **Kill** button.
-- **Stale processes** — leftover dev servers/emulators/Gradle daemons with the
-  reason and suggested tool, plus a **Kill** button.
+```
+● CPU 18% · RAM 74% · 37.5 GB free   ▾
+```
+
+- The strip refreshes every three seconds and turns amber at 80% RAM and red at
+  92% RAM or when the Host API is unreachable.
+- Clicking it opens a details popover with the Overview tab (RAM/CPU/disk bars,
+  GPU, uptime, threshold warnings, top-RAM/top-CPU tables), the **Ports** tab
+  (listeners, flagged dev ports, per-row **Kill**), and the **Stale processes**
+  tab (leftover dev servers/emulators/Gradle daemons with **Kill**).
 - Kill buttons ask for a browser confirmation, then call the same service methods
   as `port_kill` / `process_kill`, so identity re-verification and protected-PID
   refusals are identical. The panel requests go through the Host web server and
   are rejected unless they pass the connection trust fence.
 
-The panel is registered only in profiles that compose the Web server and
+The strip is registered only in profiles that compose the Web server and
 connection services; headless profiles keep the five tools.
 
 > Upgrading a bundle updates the Host half when the app starts, so quit and

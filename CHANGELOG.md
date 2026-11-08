@@ -6,9 +6,11 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Added
 
-- **Host health panel**: a sidebar entry and main-column panel with live RAM/CPU/
-  disk bars, uptime, GPU status, threshold warnings, top-RAM/top-CPU tables, a
-  ports table with per-row kills, and a stale-dev-process list with kills.
+- **App-bar usage strip**: a compact, always-visible CPU/RAM/free-disk readout in
+  the conversation header with a one-click details popover (overview bars, top
+  processes, ports with kills, stale processes with kills). It polls every three
+  seconds, degrades to an `offline` badge when the Host API is unreachable, and
+  uses the desktop transport origin when the page is not served from the HTTP host.
 - **Panel HTTP API** (`/dsh-host-health/api/`) registered through the Web server
   and admitted by the connection trust fence: stats, ports, stale processes, and
   user-confirmed kills. The API is absent in headless profiles.
