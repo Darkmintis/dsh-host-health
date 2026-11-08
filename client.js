@@ -803,10 +803,10 @@ window.__ModuleLoader__.load({
     };
     const STRIP_DOT = (tone) => ({ width: '6px', height: '6px', borderRadius: '50%', background: tone, flex: 'none' });
     const POPOVER = {
-      position: 'absolute',
-      top: 'calc(100% + 8px)',
-      left: 0,
-      zIndex: 1000,
+      position: 'fixed',
+      top: 0,
+      right: 8,
+      zIndex: 2000,
       width: 'min(430px, 92vw)',
       maxHeight: '74vh',
       overflow: 'auto',
@@ -826,6 +826,7 @@ window.__ModuleLoader__.load({
       const [stats, setStats] = useState(null);
       const [error, setError] = useState(null);
       const [open, setOpen] = useState(false);
+      const [anchor, setAnchor] = useState(null);
       const rootRef = useRef(null);
 
       const load = useCallback(async () => {
@@ -885,7 +886,16 @@ window.__ModuleLoader__.load({
             style: STRIP,
             title: error ?? `${hostName} · up ${uptime}`,
             'aria-expanded': open ? 'true' : 'false',
-            onClick: () => setOpen((current) => !current),
+            onClick: () => {
+              if (!open) {
+                const node = rootRef.current;
+                if (node !== null) {
+                  const rect = node.getBoundingClientRect();
+                  setAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+                }
+              }
+              setOpen((current) => !current);
+            },
           },
           h('span', { style: STRIP_DOT(tone), 'aria-hidden': true }),
           h('span', null, label),
@@ -909,7 +919,7 @@ window.__ModuleLoader__.load({
         open
           ? h(
               'div',
-              { style: POPOVER, 'data-host-health-popover': 'open' },
+              { style: { ...POPOVER, ...(anchor !== null ? { top: anchor.top, right: anchor.right } : {}) }, 'data-host-health-popover': 'open' },
               h(
                 'div',
                 { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
@@ -951,11 +961,15 @@ window.__ModuleLoader__.load({
         } catch {
           // Locale is optional; the cards keep their English fallbacks.
         }
-        // Compact app-bar usage strip: the leading seat is always visible, so
-        // RAM/CPU/disk stay one glance away. Clicking it opens the details
-        // popover; the full numbers live there instead of a separate panel.
-        ctx.slots.inject('conversation.header.leading', () =>
-          ctx.slots.register({ name: 'conversation.header.leading' }, HostUsageWidget),
+        // Compact app-bar usage strip: it rides the Session header utilities
+        // (next to open-in-app and schedule) so it is visible in the normal chat
+        // layout. Clicking it opens the details popover; the full numbers live
+        // there instead of a separate panel.
+        ctx.slots.inject('conversation.session.header.utilities', () =>
+          ctx.slots.register(
+            { name: 'conversation.session.header.utilities', id: 'host-health', order: -20, label: 'Host health' },
+            HostUsageWidget,
+          ),
         );
 
         for (const key of cards) {

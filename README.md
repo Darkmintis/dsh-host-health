@@ -81,8 +81,9 @@ These paths are placeholders; add the real captures before the first tagged rele
 
 ## Visual panel
 
-Installing the bundle also adds a compact **usage strip to the app bar** (the
-conversation header, always visible next to the session title):
+Installing the bundle also adds a compact **usage strip to the Session header
+utilities** (top-right of the chat header, beside the open-in-app, schedule, and
+log-download buttons):
 
 ```
 ● CPU 18% · RAM 74% · 37.5 GB free   ▾
@@ -90,7 +91,7 @@ conversation header, always visible next to the session title):
 
 - The strip refreshes every three seconds and turns amber at 80% RAM and red at
   92% RAM or when the Host API is unreachable.
-- Clicking it opens a details popover with the Overview tab (RAM/CPU/disk bars,
+- Clicking it opens a details popover — fixed-positioned so the header cannot clip it — with the Overview tab (RAM/CPU/disk bars,
   GPU, uptime, threshold warnings, top-RAM/top-CPU tables), the **Ports** tab
   (listeners, flagged dev ports, per-row **Kill**), and the **Stale processes**
   tab (leftover dev servers/emulators/Gradle daemons with **Kill**).

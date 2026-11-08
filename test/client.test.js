@@ -108,8 +108,10 @@ test('client module declares the expected id and read-only card registrations', 
   const { registrations, injectedSlots } = installClient(module);
   const cards = registrations.filter((registration) => registration.options.name === 'tool.call.toolview');
   assert.equal(cards.length, 5);
-  assert.deepEqual([...injectedSlots].sort(), ['conversation.header.leading', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
-  const strip = registrations.find((registration) => registration.options.name === 'conversation.header.leading');
+  assert.deepEqual([...injectedSlots].sort(), ['conversation.session.header.utilities', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
+  const strip = registrations.find((registration) => registration.options.name === 'conversation.session.header.utilities');
+  assert.equal(strip?.options.id, 'host-health', 'the strip is a header utility with its own id');
+  assert.equal(strip?.options.order, -20, 'the strip sorts before the shipped utilities');
   assert.equal(typeof strip?.component, 'function', 'the always-visible app-bar strip is registered');
   assert.equal(registrations.filter((registration) => registration.options.name === 'main').length, 0, 'no separate main panel is registered');
   const keys = cards.map((registration) => registration.options.key);
@@ -124,7 +126,7 @@ test('client module declares the expected id and read-only card registrations', 
 test('the app-bar strip renders a compact usage readout without throwing', () => {
   const module = loadClientModule().factory(() => createFakeReact());
   const { registrations } = installClient(module);
-  const strip = registrations.find((registration) => registration.options.name === 'conversation.header.leading');
+  const strip = registrations.find((registration) => registration.options.name === 'conversation.session.header.utilities');
   assert.ok(strip, 'strip registration exists');
   let tree;
   assert.doesNotThrow(() => {

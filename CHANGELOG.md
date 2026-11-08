@@ -6,8 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Added
 
-- **App-bar usage strip**: a compact, always-visible CPU/RAM/free-disk readout in
-  the conversation header with a one-click details popover (overview bars, top
+- **Header usage strip**: a compact CPU/RAM/free-disk readout in the Session
+  header utilities with a one-click, fixed-positioned details popover (overview bars, top
   processes, ports with kills, stale processes with kills). It polls every three
   seconds, degrades to an `offline` badge when the Host API is unreachable, and
   uses the desktop transport origin when the page is not served from the HTTP host.
