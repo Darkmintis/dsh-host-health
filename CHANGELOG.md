@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the host-health dropdown as one modern surface: headline CPU /
+  memory / disk cards, per-core bars, volume and battery rows, and compact
+  process tables without command lines. The popover renders from prefetched
+  data, so it opens populated instead of showing "loading/reading" text.
+
 ### Added
 
 - **Frame usage strip**: a compact CPU/RAM/free-disk pill pinned to the window's
@@ -18,6 +25,13 @@ All notable changes to this project are documented in this file. The format is b
   user-confirmed kills. The API is absent in headless profiles.
 - Panel API tests: unauthenticated rejection, structured payloads, port/pid kill
   routing, invalid-target refusal, and error shapes.
+
+### Changed
+
+- Redesigned the host-health dropdown as one modern surface: headline CPU /
+  memory / disk cards, per-core bars, volume and battery rows, and compact
+  process tables without command lines. The popover renders from prefetched
+  data, so it opens populated instead of showing "loading/reading" text.
 
 ### Added
 
@@ -42,6 +56,13 @@ All notable changes to this project are documented in this file. The format is b
 ## [0.1.0] - 2026-11-08
 
 Initial release. Package `@darkmintis/dsh-host-health`, a DeepSeek Harness profile bundle.
+
+### Changed
+
+- Redesigned the host-health dropdown as one modern surface: headline CPU /
+  memory / disk cards, per-core bars, volume and battery rows, and compact
+  process tables without command lines. The popover renders from prefetched
+  data, so it opens populated instead of showing "loading/reading" text.
 
 ### Added
 

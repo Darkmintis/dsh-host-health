@@ -402,397 +402,247 @@ window.__ModuleLoader__.load({
       return `${minutes}m`;
     }
 
+    // ------------------------------------------------------------------
+    // Details surface: one clean, modern overview (no tabs, no command lines)
+    // ------------------------------------------------------------------
+
+    /** Panel design tokens, all from the alias theme. */
+    const DH = {
+      card: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        padding: '12px',
+        borderRadius: '12px',
+        border: `1px solid ${HP.border1}`,
+        background: HP.layer1,
+      },
+      metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' },
+      metricCard: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        padding: '10px 11px',
+        borderRadius: '10px',
+        border: `1px solid ${HP.border1}`,
+        background: HP.base,
+        minWidth: 0,
+      },
+      label: { fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase', color: HP.sub, fontWeight: 600 },
+      value: { fontSize: '20px', fontWeight: 700, lineHeight: 1.05, color: HP.text, fontVariantNumeric: 'tabular-nums' },
+      sub: { fontSize: '10.5px', color: HP.sub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      row: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 },
+      rowLabel: { fontSize: '11.5px', color: HP.sub, whiteSpace: 'nowrap' },
+      rowValue: { marginLeft: 'auto', fontSize: '11.5px', color: HP.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+      barTrack: { height: '5px', borderRadius: '999px', background: HP.layer2, overflow: 'hidden', flex: '1 1 auto', minWidth: '40px' },
+      pill: (tone) => ({ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '1px 7px', borderRadius: '999px', border: `1px solid ${tone}`, color: tone, fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap' }),
+      table: { width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', fontVariantNumeric: 'tabular-nums' },
+      th: { textAlign: 'right', padding: '0 0 4px', color: HP.sub, fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600, borderBottom: `1px solid ${HP.border1}` },
+      thLeft: { textAlign: 'left', padding: '0 0 4px', color: HP.sub, fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600, borderBottom: `1px solid ${HP.border1}` },
+      td: { textAlign: 'right', padding: '4px 0', color: HP.text, borderBottom: `1px solid ${HP.border1}` },
+      tdLeft: { textAlign: 'left', padding: '4px 0', color: HP.text, borderBottom: `1px solid ${HP.border1}`, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    };
+
     /**
-     * Percentage bar.
-     * @param {{ label: string, percent: number, detail?: string }} props Bar props.
-     * @returns {any} metric element.
+     * Threshold tone for a 0-100 percentage.
+     * @param {number} percent Value.
+     * @param {number} [warn] Warn threshold.
+     * @param {number} [danger] Danger threshold.
+     * @returns {string} theme token.
      */
-    function HpMetric(props) {
+    function dhTone(percent, warn = 70, danger = 90) {
+      return percent >= danger ? HP.err : percent >= warn ? HP.warn : HP.ok;
+    }
+
+    /**
+     * Thin rounded progress line.
+     * @param {{ percent: number, tone?: string }} props Bar props.
+     * @returns {any} bar element.
+     */
+    function DhBar(props) {
       const percent = typeof props.percent === 'number' && Number.isFinite(props.percent) ? Math.max(0, Math.min(100, props.percent)) : 0;
-      const tone = percent >= 90 ? HP.err : percent >= 75 ? HP.warn : HP.ok;
       return h(
         'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 } },
-        h(
-          'div',
-          { style: { display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: HP_SMALL } },
-          h('span', { style: { fontWeight: 600 } }, props.label),
-          h('span', { style: { color: HP.sub } }, `${percent.toFixed(0)}%${props.detail !== undefined ? ` · ${props.detail}` : ''}`),
-        ),
-        h('div', { style: HPP.barOuter }, h('div', { style: { width: `${percent}%`, height: '100%', background: tone } })),
+        { style: DH.barTrack },
+        h('div', { style: { width: `${percent}%`, height: '100%', borderRadius: '999px', background: props.tone ?? dhTone(percent), transition: 'width 400ms ease' } }),
       );
     }
 
     /**
-     * Compact process table.
+     * One metric card: uppercase label, big value, bar, detail line.
+     * @param {{ label: string, percent: number, detail?: string, tone?: string, value?: string }} props Card props.
+     * @returns {any} card element.
+     */
+    function DhMetric(props) {
+      const percent = typeof props.percent === 'number' && Number.isFinite(props.percent) ? Math.max(0, Math.min(100, props.percent)) : 0;
+      return h(
+        'div',
+        { style: DH.metricCard },
+        h('span', { style: DH.label }, props.label),
+        h('span', { style: DH.value }, props.value ?? `${percent.toFixed(0)}%`),
+        h(DhBar, { percent, tone: props.tone ?? dhTone(percent) }),
+        props.detail !== undefined ? h('span', { style: DH.sub }, props.detail) : null,
+      );
+    }
+
+    /**
+     * Compact process table: name, PID, RAM, CPU. Never shows command lines.
      * @param {{ title: string, processes: any[] }} props Table props.
      * @returns {any} table element.
      */
-    function HpProcessTable(props) {
-      const processes = Array.isArray(props.processes) ? props.processes : [];
+    function DhProcessTable(props) {
+      const processes = Array.isArray(props.processes) ? props.processes.slice(0, 6) : [];
+      if (processes.length === 0) return null;
       return h(
         'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 } },
-        h('div', { style: { fontWeight: 600, fontSize: HP_SMALL } }, props.title),
-        processes.length === 0
-          ? h('div', { style: { color: HP.sub } }, 'no process data')
-          : h(
-              'table',
-              { style: HPP.table },
-              h('thead', null, h('tr', null, ['Process', 'PID', 'RAM', 'CPU', 'Command'].map((label) => h('th', { key: label, style: HPP.th }, label)))),
-              h(
-                'tbody',
-                null,
-                processes.map((process) =>
-                  h(
-                    'tr',
-                    { key: String(process.pid) },
-                    h('td', { style: HPP.td }, String(process.name ?? '?')),
-                    h('td', { style: HPP.td }, String(process.pid ?? '?')),
-                    h('td', { style: HPP.td }, typeof process.ramMb === 'number' ? `${Math.round(process.ramMb)} MB` : hpBytes(process.ramBytes)),
-                    h('td', { style: HPP.td }, typeof process.cpuPercent === 'number' ? `${process.cpuPercent.toFixed(1)}%` : '—'),
-                    h('td', { ...HPP.td, ...HPP.mono }, String(process.commandLine ?? '').slice(0, 160)),
-                  ),
-                ),
-              ),
-            ),
-      );
-    }
-
-    /**
-     * Overview tab.
-     * @param {{ stats: any }} props Tab props.
-     * @returns {any} tab element.
-     */
-    function HpOverview(props) {
-      const stats = props.stats;
-      if (stats === null) return h('div', { style: { color: HP.sub } }, 'Loading host stats…');
-      const host = stats.host ?? {};
-      const memory = stats.memory ?? {};
-      const cpu = stats.cpu ?? {};
-      const disk = stats.disk ?? {};
-      const warnings = Array.isArray(stats.warnings) ? stats.warnings : [];
-      return h(
-        'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+        h('span', { style: DH.label }, props.title),
         h(
-          'div',
-          { style: HPP.card },
-          h('div', { style: { fontWeight: 600 } }, `${host.hostname ?? 'host'} · ${host.platform ?? '?'} ${host.arch ?? ''}`),
-          h('div', { style: { color: HP.sub } }, `up ${hpUptime(host.uptimeSeconds)} · ${host.cpuCount ?? '?'} logical cores${typeof host.processCount === 'number' ? ` · ${host.processCount} processes` : ''} · plugin v${String(stats.pluginVersion ?? '?')}`),
-          h(HpMetric, {
-            label: 'RAM',
-            percent: typeof memory.usedPercent === 'number' ? memory.usedPercent : 0,
-            detail: `${hpBytes(memory.usedBytes)} / ${hpBytes(memory.totalBytes)}${typeof memory.committedBytes === 'number' ? ` · ${hpBytes(memory.committedBytes)} committed` : ''}`,
-          }),
-          h(HpMetric, { label: 'CPU', percent: typeof cpu.percent === 'number' ? cpu.percent : 0, detail: `${host.cpuCount ?? '?'} cores` }),
-          h(HpMetric, {
-            label: 'Disk',
-            percent: typeof disk.freePercent === 'number' ? 100 - disk.freePercent : 0,
-            detail: `${hpBytes(disk.freeBytes)} free${typeof disk.path === 'string' ? ` on ${disk.path}` : ''}`,
-          }),
-          Array.isArray(stats.cpu?.perCore) && stats.cpu.perCore.length > 0
-            ? h(
-                'div',
-                { style: { display: 'flex', gap: '2px', alignItems: 'flex-end', height: '26px', marginTop: '2px' } },
-                stats.cpu.perCore.slice(0, 32).map((core) =>
-                  h('div', {
-                    key: String(core.index),
-                    title: `Core ${core.index}: ${core.percent.toFixed(0)}%`,
-                    style: {
-                      flex: '1 1 0',
-                      minWidth: '3px',
-                      height: `${Math.max(8, Math.min(100, core.percent))}%`,
-                      background: core.percent >= 90 ? HP.err : core.percent >= 70 ? HP.warn : HP.ok,
-                      borderRadius: '2px',
-                    },
-                  }),
-                ),
-              )
-            : null,
-          Array.isArray(stats.volumes) && stats.volumes.length > 0
-            ? h(
-                'div',
-                { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' } },
-                stats.volumes.map((volume) =>
-                  h(HpMetric, {
-                    key: String(volume.path),
-                    label: `Disk ${String(volume.path)}`,
-                    percent: typeof volume.usedPercent === 'number' ? volume.usedPercent : 0,
-                    detail: `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} used`,
-                  }),
-                ),
-              )
-            : null,
-          stats.battery !== null && typeof stats.battery === 'object'
-            ? h(
-                'div',
-                { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '11.5px', color: HP.sub } },
-                h('span', { style: { color: HP.text, fontWeight: 600 } }, `Battery ${Math.round(Number(stats.battery.percent) || 0)}%`),
-                h('span', null, stats.battery.charging === true ? 'charging / on AC' : 'on battery'),
-                typeof stats.battery.runtimeMinutes === 'number' ? h('span', null, `· ~${hpUptime(stats.battery.runtimeMinutes * 60)} left`) : null,
-              )
-            : null,
-          stats.gpuStatus === 'available' && stats.gpu !== null
-            ? h('div', { style: { color: HP.sub } }, `GPU: ${String(stats.gpu.name ?? 'GPU')}${typeof stats.gpu.utilizationPercent === 'number' ? ` · ${stats.gpu.utilizationPercent}%` : ''}${typeof stats.gpu.vramUsedMb === 'number' ? ` · ${stats.gpu.vramUsedMb}/${stats.gpu.vramTotalMb} MB VRAM` : ''}`)
-            : h('div', { style: { color: HP.sub } }, 'GPU: not available (nvidia-smi not found or no supported GPU)'),
-          warnings.length > 0
-            ? h(
-                'div',
-                { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' } },
-                warnings.map((warning, index) => h('div', { key: String(index), style: { color: HP.warn, fontSize: HP_SMALL } }, `⚠ ${String(warning.message ?? warning.code ?? 'warning')}`)),
-              )
-            : null,
-        ),
-        h('div', { style: HPP.grid }, h('div', { style: HPP.card }, h(HpProcessTable, { title: 'Top RAM', processes: stats.topRam })), h('div', { style: HPP.card }, h(HpProcessTable, { title: 'Top CPU', processes: stats.topCpu }))),
-        h(
-          'details',
-          { style: HPP.card },
-          h('summary', { style: { cursor: 'pointer', fontSize: HP_SMALL, color: HP.sub } }, 'Raw text'),
-          h('pre', { style: { ...HPP.mono, margin: '6px 0 0' } }, String(props.text ?? '')),
-        ),
-      );
-    }
-
-    /**
-     * Ports tab.
-     * @param {{ ports: any, busy: any, onKill: Function }} props Tab props.
-     * @returns {any} tab element.
-     */
-    function HpPorts(props) {
-      const ports = props.ports;
-      if (ports === null) return h('div', { style: { color: HP.sub } }, 'Reading listeners…');
-      const listeners = Array.isArray(ports.listeners) ? ports.listeners : [];
-      const flagged = Array.isArray(ports.flagged) ? ports.flagged : [];
-      return h(
-        'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-        ports.available === false ? h('div', { style: HPP.error }, `Listener table unavailable. ${Array.isArray(ports.notes) ? ports.notes.join(' ') : ''}`) : null,
-        h(
-          'div',
-          { style: HPP.card },
-          h('div', { style: { fontWeight: 600 } }, `TCP listeners${typeof ports.source === 'string' ? ` (${ports.source})` : ''}`),
-          listeners.length === 0
-            ? h('div', { style: { color: HP.sub } }, 'No enumerable TCP listener.')
-            : h(
-                'table',
-                { style: HPP.table },
-                h('thead', null, h('tr', null, ['Port', 'Address', 'PID', 'Process', 'Known dev port', ''].map((label) => h('th', { key: label, style: HPP.th }, label)))),
-                h(
-                  'tbody',
-                  null,
-                  listeners.map((listener) =>
-                    h(
-                      'tr',
-                      { key: `${listener.port}-${listener.pid}-${listener.address}` },
-                      h('td', { style: { ...HPP.td, ...HPP.mono } }, String(listener.port)),
-                      h('td', { style: { ...HPP.td, ...HPP.mono } }, String(listener.address ?? '')),
-                      h('td', { style: HPP.td }, String(listener.pid ?? '?')),
-                      h('td', { style: HPP.td }, String(listener.name ?? 'unknown')),
-                      h('td', { style: HPP.td }, listener.knownDevPort === true ? String(listener.devLabel ?? 'yes') : ''),
-                      h(
-                        'td',
-                        { style: HPP.td },
-                        typeof listener.pid === 'number' && listener.pid > 0
-                          ? h(
-                              'button',
-                              {
-                                type: 'button',
-                                style: HPP.buttonDanger,
-                                disabled: props.busy !== null,
-                                onClick: () =>
-                                  window.confirm(`Kill ${String(listener.name ?? 'process')} (pid ${String(listener.pid)}) listening on port ${String(listener.port)}?`)
-                                    ? props.onKill({ port: listener.port })
-                                    : undefined,
-                              },
-                              'Kill',
-                            )
-                          : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-        ),
-        h(
-          'div',
-          { style: HPP.card },
-          h('div', { style: { fontWeight: 600 } }, 'Flagged dev ports'),
+          'table',
+          { style: DH.table },
+          h('thead', null, h('tr', null, h('th', { style: DH.thLeft }, 'Process'), h('th', { style: DH.th }, 'PID'), h('th', { style: DH.th }, 'RAM'), h('th', { style: DH.th }, 'CPU'))),
           h(
-            'div',
-            { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
-            flagged.map((entry) =>
+            'tbody',
+            null,
+            processes.map((process) =>
               h(
-                'span',
-                { key: String(entry.port), style: HPP.pill(entry.status === 'in_use' ? HP.warn : HP.sub) },
-                `${String(entry.port)} ${String(entry.status ?? '?')}${entry.name !== null && entry.name !== undefined ? ` · ${String(entry.name)}` : ''}${entry.devLabel !== undefined ? ` (${String(entry.devLabel)})` : ''}`,
+                'tr',
+                { key: String(process.pid) },
+                h('td', { style: DH.tdLeft, title: String(process.name ?? '') }, String(process.name ?? '?')),
+                h('td', { style: DH.td }, String(process.pid ?? '?')),
+                h('td', { style: DH.td }, typeof process.ramMb === 'number' ? `${Math.round(process.ramMb)} MB` : '—'),
+                h('td', { style: DH.td }, typeof process.cpuPercent === 'number' ? `${process.cpuPercent.toFixed(1)}%` : '—'),
               ),
             ),
           ),
         ),
-        Array.isArray(ports.warnings) && ports.warnings.length > 0
+      );
+    }
+
+    /**
+     * The details surface: one glance at CPU, RAM, storage, battery, cores, and
+     * the busiest processes. Rendered from data the widget already holds, so it
+     * opens instantly instead of showing loading text.
+     * @param {Record<string, any>} props Surface props.
+     * @returns {any} details element.
+     */
+    function HostDetails(props) {
+      const stats = props.stats;
+      const host = stats !== null && typeof stats === 'object' ? stats.host ?? {} : {};
+      const memory = stats !== null && typeof stats === 'object' ? stats.memory ?? {} : {};
+      const cpu = stats !== null && typeof stats === 'object' ? stats.cpu ?? {} : {};
+      const volumes = stats !== null && typeof stats === 'object' && Array.isArray(stats.volumes) ? stats.volumes : [];
+      const battery = stats !== null && typeof stats === 'object' && stats.battery !== null && typeof stats.battery === 'object' ? stats.battery : null;
+      const gpu = stats !== null && typeof stats === 'object' && stats.gpu !== null && typeof stats.gpu === 'object' ? stats.gpu : null;
+      const warnings = stats !== null && typeof stats === 'object' && Array.isArray(stats.warnings) ? stats.warnings : [];
+
+      const cpuPercent = typeof cpu.percent === 'number' ? cpu.percent : 0;
+      const memPercent = typeof memory.usedPercent === 'number' ? memory.usedPercent : 0;
+      const primary = volumes.length > 0 ? volumes[0] : null;
+      const diskPercent = primary !== null && typeof primary.usedPercent === 'number' ? primary.usedPercent : 0;
+      const perCore = Array.isArray(cpu.perCore) ? cpu.perCore.slice(0, 16) : [];
+
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '9px', minWidth: 0 } },
+
+        h(
+          'div',
+          { style: DH.metricGrid },
+          h(DhMetric, { label: 'CPU', percent: cpuPercent, detail: `${String(host.cpuCount ?? '?')} cores` }),
+          h(DhMetric, { label: 'Memory', percent: memPercent, detail: `${hpBytes(memory.usedBytes)} of ${hpBytes(memory.totalBytes)}` }),
+          h(DhMetric, {
+            label: primary !== null ? `Disk ${String(primary.path)}` : 'Disk',
+            percent: diskPercent,
+            detail: primary !== null ? `${hpBytes(primary.freeBytes)} free` : 'unavailable',
+          }),
+        ),
+
+        perCore.length > 0
           ? h(
               'div',
-              { style: HPP.card },
-              ports.warnings.map((warning, index) => h('div', { key: String(index), style: { color: HP.warn, fontSize: HP_SMALL } }, String(warning.message ?? warning.code ?? 'warning'))),
+              { style: DH.card },
+              h(
+                'div',
+                { style: DH.row },
+                h('span', { style: DH.label }, 'Cores'),
+                h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `max ${perCore.reduce((peak, core) => Math.max(peak, core.percent), 0).toFixed(0)}%`),
+              ),
+              h(
+                'div',
+                { style: { display: 'flex', gap: '2px', alignItems: 'flex-end', height: '22px' } },
+                perCore.map((core) =>
+                  h('div', {
+                    key: String(core.index),
+                    title: `Core ${core.index}: ${core.percent.toFixed(0)}%`,
+                    style: { flex: '1 1 0', minWidth: '3px', height: `${Math.max(10, Math.min(100, core.percent))}%`, borderRadius: '2px', background: dhTone(core.percent, 70, 90), transition: 'height 400ms ease' },
+                  }),
+                ),
+              ),
             )
           : null,
-      );
-    }
 
-    /**
-     * Stale-process tab.
-     * @param {{ stale: any, busy: any, onKill: Function }} props Tab props.
-     * @returns {any} tab element.
-     */
-    function HpStale(props) {
-      const stale = props.stale;
-      if (stale === null) return h('div', { style: { color: HP.sub } }, 'Scanning dev processes…');
-      const entries = Array.isArray(stale.entries) ? stale.entries : [];
-      return h(
-        'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        h('div', { style: { color: HP.sub } }, `${entries.length} candidate(s) · stale threshold ${String(stale.staleAfterMinutes ?? '?')} min`),
-        entries.length === 0
-          ? h('div', { style: HPP.card }, 'No leftover dev servers, emulators, or Gradle daemons detected.')
-          : entries.map((entry) => {
-              const suggested = entry.suggested !== null && typeof entry.suggested === 'object' ? entry.suggested : undefined;
-              const args = suggested !== undefined && suggested.args !== null && typeof suggested.args === 'object' ? suggested.args : undefined;
-              const target = args !== undefined && typeof args.port === 'number' ? { port: args.port } : args !== undefined && typeof args.pid === 'number' ? { pid: args.pid } : undefined;
-              return h(
-                'div',
-                { key: `${String(entry.pid)}-${String(entry.category)}`, style: HPP.card },
+        h(
+          'div',
+          { style: DH.card },
+          volumes.length > 0
+            ? volumes.map((volume) =>
                 h(
                   'div',
-                  { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
-                  h('span', { style: HPP.pill(entry.stale === true ? HP.warn : HP.sub) }, `${entry.stale === true ? 'STALE' : 'candidate'}/${String(entry.confidence ?? 'low')}`),
-                  h('span', { style: { fontWeight: 600 } }, String(entry.label ?? entry.category ?? 'process')),
-                  h('span', { style: { color: HP.sub } }, `${String(entry.name ?? '?')} · pid ${String(entry.pid)}${typeof entry.port === 'number' ? ` · port ${entry.port}` : ''}${typeof entry.ageMinutes === 'number' ? ` · ${Math.round(entry.ageMinutes)} min` : ''}`),
-                  h('span', { style: { flex: '1 1 auto' } }),
-                  target !== undefined
-                    ? h(
-                        'button',
-                        {
-                          type: 'button',
-                          style: HPP.buttonDanger,
-                          disabled: props.busy !== null,
-                          onClick: () => window.confirm(`Kill ${String(entry.name ?? 'process')} (pid ${String(entry.pid)})?`) && props.onKill(target),
-                        },
-                        'Kill',
-                      )
-                    : null,
+                  { key: String(volume.path), style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+                  h(
+                    'div',
+                    { style: DH.row },
+                    h('span', { style: DH.rowLabel }, `Disk ${String(volume.path)}`),
+                    h('span', { style: DH.rowValue }, `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} · ${Number(volume.usedPercent ?? 0).toFixed(0)}%`),
+                  ),
+                  h(DhBar, { percent: volume.usedPercent, tone: dhTone(volume.usedPercent, 80, 93) }),
                 ),
-                h('div', { style: { color: HP.sub, fontSize: HP_SMALL } }, String(entry.reason ?? '')),
-                suggested !== undefined ? h('div', { style: { color: HP.sub, fontSize: HP_SMALL, ...HPP.mono } }, `next: ${String(suggested.tool)}(${JSON.stringify(suggested.args ?? {})})`) : null,
-              );
-            }),
-      );
-    }
+              )
+            : null,
+          battery !== null
+            ? h(
+                'div',
+                { style: DH.row },
+                h('span', { style: DH.rowLabel }, 'Battery'),
+                h('span', { style: DH.pill(battery.charging === true ? HP.ok : dhTone(100 - (Number(battery.percent) || 0), 60, 30)) }, `${Math.round(Number(battery.percent) || 0)}% ${battery.charging === true ? '· charging' : '· on battery'}`),
+                typeof battery.runtimeMinutes === 'number' ? h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `~${hpUptime(battery.runtimeMinutes * 60)} left`) : null,
+              )
+            : null,
+          gpu !== null
+            ? h(
+                'div',
+                { style: DH.row },
+                h('span', { style: DH.rowLabel }, 'GPU'),
+                h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `${String(gpu.name ?? 'GPU')}${typeof gpu.utilizationPercent === 'number' ? ` · ${gpu.utilizationPercent}%` : ''}`),
+              )
+            : null,
+          typeof memory.committedBytes === 'number'
+            ? h(
+                'div',
+                { style: DH.row },
+                h('span', { style: DH.rowLabel }, 'Committed'),
+                h('span', { style: DH.rowValue }, hpBytes(memory.committedBytes)),
+              )
+            : null,
+        ),
 
-    /**
-     * The main Host health panel.
-     * @param {Record<string, any>} props Slot props.
-     * @returns {any} panel element.
-     */
-    function HostHealthPanel(props) {
-      const { useState, useEffect, useCallback } = React;
-      const [tab, setTab] = useState('overview');
-      const [stats, setStats] = useState(null);
-      const [statsText, setStatsText] = useState('');
-      const [ports, setPorts] = useState(null);
-      const [stale, setStale] = useState(null);
-      const [error, setError] = useState(null);
-      const [busy, setBusy] = useState(null);
-      const [toast, setToast] = useState(null);
-
-      const loadStats = useCallback(async () => {
-        try {
-          const payload = await hpFetchJson(hpApiUrl('stats'));
-          setStats(payload.value ?? null);
-          setStatsText(String(payload.text ?? ''));
-          setError(null);
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      }, []);
-
-      const loadPorts = useCallback(async () => {
-        try {
-          const payload = await hpFetchJson(hpApiUrl('ports'));
-          setPorts(payload.value ?? null);
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      }, []);
-
-      const loadStale = useCallback(async () => {
-        try {
-          const payload = await hpFetchJson(hpApiUrl('stale'));
-          setStale(payload.value ?? null);
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      }, []);
-
-      useEffect(() => {
-        loadStats();
-        const timer = setInterval(() => loadStats(), STATS_POLL_MS);
-        return () => clearInterval(timer);
-      }, [loadStats]);
-
-      useEffect(() => {
-        if (tab === 'ports') loadPorts();
-        if (tab === 'stale') loadStale();
-      }, [tab, loadPorts, loadStale]);
-
-      useEffect(() => {
-        if (toast === null) return undefined;
-        const timer = setTimeout(() => setToast(null), 6_000);
-        return () => clearTimeout(timer);
-      }, [toast]);
-
-      const killTarget = useCallback(
-        async (target) => {
-          setBusy('kill');
-          try {
-            const payload = await hpFetchJson(hpApiUrl('kill'), { method: 'POST', body: target });
-            setToast({ tone: 'ok', text: String(payload.text ?? 'kill finished') });
-            if (tab === 'ports') await loadPorts();
-            if (tab === 'stale') await loadStale();
-          } catch (cause) {
-            setToast({ tone: 'error', text: cause instanceof Error ? cause.message : String(cause) });
-          } finally {
-            setBusy(null);
-          }
-        },
-        [tab, loadPorts, loadStale],
-      );
-
-      return h(
-        'div',
-        { 'data-host-health-panel': 'main', style: HPP.wrap },
         h(
           'div',
-          { style: HPP.header },
-          h('span', { style: HPP.title }, 'Host health'),
-          h('span', { style: HPP.sub }, stats === null ? 'loading…' : `${String(stats.host?.hostname ?? 'host')} · up ${hpUptime(stats.host?.uptimeSeconds)}`),
-          h('span', { style: { flex: '1 1 auto' } }),
-          h('button', { type: 'button', style: HPP.button, onClick: () => (tab === 'ports' ? loadPorts() : tab === 'stale' ? loadStale() : loadStats()), disabled: busy !== null }, 'Refresh'),
+          { style: DH.card },
+          h(DhProcessTable, { title: 'Top CPU', processes: stats?.topCpu }),
+          stats?.topRam !== undefined ? h('div', { style: { marginTop: '4px' } }, h(DhProcessTable, { title: 'Top RAM', processes: stats?.topRam })) : null,
         ),
-        h(
-          'div',
-          { style: HPP.tabs },
-          [
-            ['overview', 'Overview'],
-            ['ports', 'Ports'],
-            ['stale', 'Stale processes'],
-          ].map(([id, label]) => h('button', { key: id, type: 'button', style: tab === id ? HPP.buttonPrimary : HPP.button, onClick: () => setTab(id) }, label)),
-        ),
-        error !== null ? h('div', { style: HPP.error }, error) : null,
-        toast !== null ? h('div', { style: HPP.toast(toast.tone) }, toast.text) : null,
-        tab === 'overview' ? h(HpOverview, { stats, text: statsText }) : null,
-        tab === 'ports' ? h(HpPorts, { ports, busy, onKill: killTarget }) : null,
-        tab === 'stale' ? h(HpStale, { stale, busy, onKill: killTarget }) : null,
+
+        warnings.length > 0
+          ? h(
+              'div',
+              { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              warnings.map((warning, index) =>
+                h('div', { key: String(index), style: { ...DH.sub, color: HP.warn, whiteSpace: 'normal' } }, `⚠ ${String(warning.message ?? warning.code ?? 'warning')}`),
+              ),
+            )
+          : null,
       );
     }
 
@@ -888,13 +738,14 @@ window.__ModuleLoader__.load({
       top: 0,
       right: 8,
       zIndex: 2000,
-      width: 'min(430px, 92vw)',
-      maxHeight: '74vh',
+      width: 'min(460px, 92vw)',
+      maxHeight: '76vh',
       overflow: 'auto',
-      padding: '10px',
-      borderRadius: '10px',
+      padding: '12px',
+      borderRadius: '14px',
       border: `1px solid ${HP.border2}`,
-      background: HP.layer1,
+      background: HP.overlay,
+      backdropFilter: 'blur(14px)',
     };
 
     /**
@@ -1009,26 +860,23 @@ window.__ModuleLoader__.load({
               { style: { ...POPOVER, ...(anchor !== null ? { top: anchor.top, right: anchor.right } : {}) }, 'data-host-health-popover': 'open' },
               h(
                 'div',
-                { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } },
-                h('span', { style: { fontWeight: 600, fontSize: '13px', color: HP.text } }, 'Host health'),
-                h('span', { style: { color: HP.sub, fontSize: '11.5px' } }, `${hostName} · up ${uptime}`),
+                { style: { display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' } },
+                h('span', { style: { fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: HP.sub } }, 'Host health'),
+                h('span', { style: { color: HP.text, fontSize: '12.5px', fontWeight: 600 } }, hostName),
+                h('span', { style: { color: HP.sub, fontSize: '11px' } }, `· up ${uptime}`),
                 h('span', { style: { flex: '1 1 auto' } }),
                 h(
                   'button',
                   {
                     type: 'button',
-                    style: { ...HPP.button, padding: '2px 7px' },
+                    style: { ...HPP.button, padding: '1px 8px', borderRadius: '999px' },
                     onClick: () => setOpen(false),
                     'aria-label': 'Close host health details',
                   },
-                  'Close',
+                  '✕',
                 ),
               ),
-              h(
-                HostHealthGuard,
-                null,
-                h(HostHealthPanel, {}),
-              ),
+              h(HostHealthGuard, null, h(HostDetails, { stats })),
               error !== null ? h('div', { style: { marginTop: '6px', color: HP.err, fontSize: '11px', whiteSpace: 'pre-wrap' } }, `Host API: ${error}`) : null,
             )
           : null,

@@ -135,6 +135,29 @@ test('the app-bar strip renders a compact usage readout without throwing', () =>
   assert.equal(treeContains(tree, 'Host'), true, 'loading label is shown before the first sample');
 });
 
+test('the strip opens a details surface with no loading text and no command lines', () => {
+  const React = createFakeReact();
+  // useState call order: stats, error, open, anchor → force `open` true.
+  let calls = 0;
+  const baseUseState = React.useState;
+  React.useState = (initial) => {
+    calls += 1;
+    return calls === 3 ? [true, () => {}] : baseUseState(initial);
+  };
+  const module = loadClientModule().factory(() => React);
+  const { registrations } = installClient(module);
+  const strip = registrations.find((registration) => registration.options.name === 'shell.overlay');
+  assert.ok(strip);
+  let tree;
+  assert.doesNotThrow(() => {
+    tree = strip.component({});
+  });
+  assert.equal(treeContains(tree, 'Host health'), true, 'the popover header renders');
+  const rendered = collectText(tree).join('\n');
+  assert.doesNotMatch(rendered, /Loading host stats|Reading listeners|Scanning dev processes|Loading/i, 'no loading placeholders remain');
+  assert.doesNotMatch(rendered, /commandLine|Command/i, 'process tables never show command lines');
+});
+
 test('card components never throw on missing or malformed props', () => {
   const module = loadClientModule().factory(() => createFakeReact());
   const { registrations } = installClient(module);
