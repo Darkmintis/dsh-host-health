@@ -1,0 +1,4 @@
+List of devices attached
+TESTDEVICE01            device product:m12dd model:SM_M127G device:m12 transport_id:2
+emulator-5556          offline transport_id:1
+

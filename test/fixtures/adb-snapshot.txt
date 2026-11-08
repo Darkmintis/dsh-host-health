@@ -1,0 +1,93 @@
+MemTotal:        3793624 kB
+MemFree:          143724 kB
+MemAvailable:     889884 kB
+Buffers:            2472 kB
+Cached:           852440 kB
+SwapCached:       220300 kB
+Active:          1289768 kB
+Inactive:         914712 kB
+Active(anon):    1004332 kB
+Inactive(anon):   374708 kB
+Active(file):     285436 kB
+Inactive(file):   540004 kB
+Unevictable:        2844 kB
+Mlocked:            2844 kB
+SwapTotal:       4194300 kB
+SwapFree:        2577052 kB
+Dirty:               936 kB
+Writeback:             0 kB
+AnonPages:       1241068 kB
+Mapped:           573532 kB
+Shmem:             30032 kB
+KReclaimable:      85952 kB
+Slab:             303260 kB
+SReclaimable:      85952 kB
+SUnreclaim:       217308 kB
+KernelStack:       70368 kB
+PageTables:        99648 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     6091112 kB
+Committed_AS:   97709720 kB
+VmallocTotal:   263061440 kB
+VmallocUsed:      180464 kB
+VmallocChunk:          0 kB
+Percpu:             9024 kB
+CmaTotal:         303104 kB
+CmaFree:               0 kB
+===DSH===
+cpu  27192021 2549382 15288942 134388406 2112440 0 449009 0 0 0
+===DSH===
+Filesystem       1K-blocks     Used Available Use% Mounted on
+/dev/block/dm-44  53819372 51746224   1942076  97% /data/user/0
+===DSH===
+Current Battery Service state:
+  AC powered: false
+  USB powered: true
+  Wireless powered: false
+  Max charging current: 0
+  Max charging voltage: 0
+  Charge counter: 2455000
+  status: 2
+  health: 2
+  present: true
+  level: 49
+  scale: 100
+  voltage: 3890
+  temperature: 338
+  technology: Li-ion
+  batteryMiscEvent: 131072
+  batteryCurrentEvent: 32768
+  mSecPlugTypeSummary: 2
+  LED Charging: true
+  LED Low Battery: true
+  current now: 734
+  charge counter: 2455000
+  Adaptive Fast Charging Settings: true
+  Super Fast Charging Settings: false
+FEATURE_WIRELESS_FAST_CHARGER_CONTROL: true
+  mWasUsedWirelessFastChargerPreviously: false
+  mWirelessFastChargingSettingsEnable: true
+LLB CAL: 20220530
+LLB MAN: 
+LLB CURRENT: YEAR2026M11D6
+LLB DIFF: 231
+  mSavedBatteryBeginningDate: 0
+SEC_FEATURE_BATTERY_FULL_CAPACITY: true
+  mFullCapacityEnable: false
+FEATURE_HICCUP_CONTROL: false
+FEATURE_SUPPORTED_DAILY_BOARD: false
+SEC_FEATURE_BATTERY_LIFE_EXTENDER: false
+SEC_FEATURE_USE_WIRELESS_POWER_SHARING: false
+BatteryInfoBackUp
+  mSavedBatteryAsoc: 83
+  mSavedBatteryMaxTemp: 458
+  mSavedBatteryMaxCurrent: 2292
+  mSavedBatteryUsage: 109272
+  FEATURE_SAVE_BATTERY_CYCLE: true
+  SEC_FEATURE_PREVENT_SWELLING: false
+===DSH===
+MODEL=SM-M127G
+RELEASE=13
+SDK=33

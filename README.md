@@ -6,7 +6,7 @@ This is a **DSH profile bundle**. It adds five Host tools and a small read-only 
 
 | Tool | Purpose |
 | --- | --- |
-| `host_stats` | RAM, CPU, disk, uptime, load, best-effort GPU, top 8 processes by RAM and by CPU, dev-process highlights |
+| `host_stats` | Host RAM/CPU/volumes/battery/GPU plus connected Android devices (RAM, CPU, /data, battery), top processes, dev highlights |
 | `ports_list` | TCP listeners with PID and process name, every known dev port flagged |
 | `stale_dev_processes` | Detects leftover preview servers, Flutter/Dart runs, Android emulators, Gradle daemons, and suggests a safe target |
 | `port_kill` | Kills the single process listening on a port — **requires approval**, re-verifies identity |
@@ -111,6 +111,26 @@ connection services; headless profiles keep the five tools.
 
 > Upgrading a bundle updates the Host half when the app starts, so quit and
 > restart DeepSeek Harness once after installing a new version.
+## Mobile health over adb
+
+When an Android phone or emulator is connected with adb, `host_stats` grows a
+**Devices** section and the panel adds one compact card per device:
+
+- model, Android version/SDK, and the adb serial;
+- memory used/available from `/proc/meminfo`;
+- `/data` usage from `df /data`;
+- battery level, charging state, and temperature from `dumpsys battery`;
+- CPU percentage computed from two consecutive `/proc/stat` samples (the strip
+  polls every few seconds, so the second sample arrives on the next refresh).
+
+Up to four devices are reported per call; multi-device setups get one card each.
+Linux/macOS hosts use the same adb binary. No device is required: without adb or
+a connected device the host section renders alone and the plugin reports
+`mobileStatus: "unavailable"` / `"none"` in the JSON.
+
+The plugin resolves the adb binary from `ADB`, `ANDROID_HOME`,
+`ANDROID_SDK_ROOT`, the standard SDK locations, then `PATH`. Every adb call is a
+bounded child process with a captured, capped output — like every other probe.
 ## Tool reference
 
 ### `host_stats`

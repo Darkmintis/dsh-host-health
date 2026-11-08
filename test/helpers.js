@@ -106,11 +106,15 @@ export function createFakeProbes(options = {}) {
   const listenerSnapshots = options.listeners ?? [makeListenerSnapshot(1_000_000, [])];
   const gpuValues = options.gpu ?? [null];
   const systemSnapshots = options.systemSnapshots ?? [null];
+  const mobileDeviceValues = options.mobileDevices ?? [{ available: false, devices: [] }];
+  const mobileSnapshotValues = options.mobileSnapshots ?? [null];
   const processTableSeq = sequence(processTables);
   const listenerSeq = sequence(listenerSnapshots);
   const gpuSeq = sequence(gpuValues);
   const systemSeq = sequence(systemSnapshots);
-  const calls = { processTable: 0, listeners: 0, gpu: 0, systemSnapshot: 0, freshProcessTable: 0, freshListeners: 0 };
+  const mobileDeviceSeq = sequence(mobileDeviceValues);
+  const mobileSnapshotSeq = sequence(mobileSnapshotValues);
+  const calls = { processTable: 0, listeners: 0, gpu: 0, systemSnapshot: 0, mobileDevices: 0, mobileSnapshot: 0, freshProcessTable: 0, freshListeners: 0 };
   return {
     calls,
     async processTable(probeOptions = {}) {
@@ -130,6 +134,14 @@ export function createFakeProbes(options = {}) {
     async systemSnapshot() {
       calls.systemSnapshot += 1;
       return systemSeq();
+    },
+    async mobileDevices() {
+      calls.mobileDevices += 1;
+      return mobileDeviceSeq();
+    },
+    async mobileSnapshot(serial) {
+      calls.mobileSnapshot += 1;
+      return mobileSnapshotSeq();
     },
     clearNotes() {},
     clearCache() {},

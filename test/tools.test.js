@@ -282,6 +282,45 @@ test('host_stats text shows committed memory, per-core CPU, volumes, and battery
   assert.match(text, /D: {3}\s+/);
 });
 
+test('host_stats text reports connected Android devices', () => {
+  const text = renderHostStats({
+    ok: true,
+    host: { hostname: 'dev-box', platform: 'win32', arch: 'x64', cpuCount: 8, uptimeSeconds: 7200 },
+    memory: { totalBytes: 16 * 1024 ** 3, freeBytes: 8 * 1024 ** 3, usedBytes: 8 * 1024 ** 3, usedPercent: 50 },
+    cpu: { percent: 20 },
+    disk: null,
+    volumes: [],
+    battery: null,
+    mobiles: [
+      {
+        serial: 'TESTDEVICE01',
+        model: 'SM-M127G',
+        androidVersion: '13',
+        sdk: 33,
+        battery: { percent: 49, charging: true, temperatureC: 34 },
+        memory: { totalBytes: 3_800_000_000, availableBytes: 900_000_000, usedBytes: 2_900_000_000, usedPercent: 76.5 },
+        storage: { totalBytes: 55_000_000_000, freeBytes: 2_000_000_000, usedBytes: 53_000_000_000, usedPercent: 96.4 },
+        cpuPercent: 12.5,
+      },
+    ],
+    mobileStatus: 'available',
+    load: null,
+    gpu: null,
+    gpuStatus: 'skipped',
+    topRam: [],
+    topCpu: [],
+    devProcesses: [],
+    warnings: [],
+    notes: [],
+  });
+  assert.match(text, /Mobiles/);
+  assert.match(text, /SM-M127G/);
+  assert.match(text, /RAM 76\.5%/);
+  assert.match(text, /CPU 12\.5%/);
+  assert.match(text, /disk 96\.4% used/);
+  assert.match(text, /battery 49\.0% charging/);
+});
+
 test('renderers tolerate partial payloads', () => {
   assert.match(renderHostStats({ ok: true }), /Host: unknown/);
   assert.match(renderPortsList({ ok: true }), /TCP listeners: 0/);

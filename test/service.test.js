@@ -32,6 +32,8 @@ function createHarness(overrides = {}) {
     listeners: overrides.listeners,
     gpu: overrides.gpu,
     systemSnapshots: overrides.systemSnapshots,
+    mobileDevices: overrides.mobileDevices,
+    mobileSnapshots: overrides.mobileSnapshots,
   });
   if (overrides.probeNotes !== undefined) probes.notes = () => overrides.probeNotes;
   const system = createFakeSystem(overrides.system);
@@ -594,4 +596,48 @@ test('hostStats prefers the system snapshot for memory, cores, volumes, battery,
   assert.equal(value.battery.percent, 85);
   assert.equal(value.battery.charging, true);
   assert.equal(value.host.processCount, 321);
+});
+
+test('hostStats reports connected Android devices over the adb probe', async () => {
+  const { service, probes } = createHarness({
+    processTables: [tableA, tableB],
+    mobileDevices: [{ available: true, devices: [{ serial: 'TESTDEVICE01', state: 'device', model: 'SM M127G' }] }],
+    mobileSnapshots: [
+      {
+        model: 'SM-M127G',
+        androidVersion: '13',
+        sdk: 33,
+        battery: { percent: 49, charging: true, temperatureC: 34 },
+        memory: { totalBytes: 3_794_624 * 1024, availableBytes: 889_884 * 1024, usedBytes: 2_904_740 * 1024, usedPercent: 76.5 },
+        storage: { totalBytes: 53_819_372 * 1024, freeBytes: 1_942_076 * 1024, usedBytes: 53_819_372 * 1024 - 1_942_076 * 1024, usedPercent: 96.4 },
+        cpuPercent: 12.5,
+      },
+    ],
+  });
+  const value = await service.hostStats({ includeGpu: false });
+  assert.equal(value.ok, true);
+  assert.equal(value.mobileStatus, 'available');
+  assert.equal(value.mobiles.length, 1);
+  const device = value.mobiles[0];
+  assert.equal(device.serial, 'TESTDEVICE01');
+  assert.equal(device.model, 'SM-M127G', 'the phone-reported model wins');
+  assert.equal(device.androidVersion, '13');
+  assert.equal(device.battery.percent, 49);
+  assert.equal(device.memory.usedPercent, 76.5);
+  assert.equal(device.storage.usedPercent, 96.4);
+  assert.equal(device.cpuPercent, 12.5);
+  assert.equal(probes.calls.mobileDevices, 1);
+  assert.equal(probes.calls.mobileSnapshot, 1);
+});
+
+test('hostStats stays host-only when mobile is skipped or adb is unavailable', async () => {
+  const skipped = createHarness({ processTables: [tableA, tableB] });
+  const withoutMobile = await skipped.service.hostStats({ includeGpu: false, includeMobile: false });
+  assert.equal(withoutMobile.mobileStatus, 'skipped');
+  assert.deepEqual(withoutMobile.mobiles, []);
+
+  const unavailable = createHarness({ processTables: [tableA, tableB], mobileDevices: [{ available: false, devices: [] }] });
+  const noAdb = await unavailable.service.hostStats({ includeGpu: false });
+  assert.equal(noAdb.mobileStatus, 'unavailable');
+  assert.deepEqual(noAdb.mobiles, []);
 });

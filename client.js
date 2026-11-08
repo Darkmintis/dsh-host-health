@@ -480,7 +480,7 @@ window.__ModuleLoader__.load({
         { style: DH.metricCard },
         h('span', { style: DH.label }, props.label),
         h('span', { style: DH.value }, props.value ?? `${percent.toFixed(0)}%`),
-        h(DhBar, { percent, tone: props.tone ?? dhTone(percent) }),
+        h(DhBar, { percent, tone: props.accent ?? props.tone ?? dhTone(percent) }),
         props.detail !== undefined ? h('span', { style: DH.sub }, props.detail) : null,
       );
     }
@@ -535,6 +535,7 @@ window.__ModuleLoader__.load({
       const battery = stats !== null && typeof stats === 'object' && stats.battery !== null && typeof stats.battery === 'object' ? stats.battery : null;
       const gpu = stats !== null && typeof stats === 'object' && stats.gpu !== null && typeof stats.gpu === 'object' ? stats.gpu : null;
       const warnings = stats !== null && typeof stats === 'object' && Array.isArray(stats.warnings) ? stats.warnings : [];
+      const mobiles = stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
 
       const cpuPercent = typeof cpu.percent === 'number' ? cpu.percent : 0;
       const memPercent = typeof memory.usedPercent === 'number' ? memory.usedPercent : 0;
@@ -548,14 +549,30 @@ window.__ModuleLoader__.load({
 
         h(
           'div',
-          { style: DH.metricGrid },
-          h(DhMetric, { label: 'CPU', percent: cpuPercent, detail: `${String(host.cpuCount ?? '?')} cores` }),
-          h(DhMetric, { label: 'Memory', percent: memPercent, detail: `${hpBytes(memory.usedBytes)} of ${hpBytes(memory.totalBytes)}` }),
-          h(DhMetric, {
-            label: primary !== null ? `Disk ${String(primary.path)}` : 'Disk',
-            percent: diskPercent,
-            detail: primary !== null ? `${hpBytes(primary.freeBytes)} free` : 'unavailable',
-          }),
+          { style: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' } },
+          h(DhMetric, { label: 'CPU', percent: cpuPercent, detail: `${String(host.cpuCount ?? '?')} cores · ${perCore.length > 0 ? `${perCore.reduce((peak, core) => Math.max(peak, core.percent), 0).toFixed(0)}% peak core` : 'aggregate'}`, accent: HP.brand }),
+          h(DhMetric, { label: 'Memory', percent: memPercent, detail: `${hpBytes(memory.usedBytes)} of ${hpBytes(memory.totalBytes)}`, accent: HP.brand }),
+        ),
+
+        h(
+          'div',
+          { style: DH.card },
+          h('div', { style: DH.row }, h('span', { style: { ...DH.label, color: HP.brand } }, 'Storage'), h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, volumes.length > 0 ? `${volumes.length} volume${volumes.length === 1 ? '' : 's'}` : 'unavailable')),
+          volumes.length === 0
+            ? h('span', { style: DH.sub }, 'No volume data from the host probe.')
+            : volumes.map((volume) =>
+                h(
+                  'div',
+                  { key: String(volume.path), style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+                  h(
+                    'div',
+                    { style: DH.row },
+                    h('span', { style: { ...DH.rowLabel, color: HP.text, fontWeight: 600 } }, String(volume.path)),
+                    h('span', { style: DH.rowValue }, `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} · ${Number(volume.usedPercent ?? 0).toFixed(0)}%`),
+                  ),
+                  h(DhBar, { percent: volume.usedPercent, tone: dhTone(volume.usedPercent, 80, 93), color: dhTone(volume.usedPercent, 80, 93) }),
+                ),
+              ),
         ),
 
         perCore.length > 0
@@ -585,21 +602,7 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { style: DH.card },
-          volumes.length > 0
-            ? volumes.map((volume) =>
-                h(
-                  'div',
-                  { key: String(volume.path), style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-                  h(
-                    'div',
-                    { style: DH.row },
-                    h('span', { style: DH.rowLabel }, `Disk ${String(volume.path)}`),
-                    h('span', { style: DH.rowValue }, `${hpBytes(volume.usedBytes)} / ${hpBytes(volume.totalBytes)} · ${Number(volume.usedPercent ?? 0).toFixed(0)}%`),
-                  ),
-                  h(DhBar, { percent: volume.usedPercent, tone: dhTone(volume.usedPercent, 80, 93) }),
-                ),
-              )
-            : null,
+
           battery !== null
             ? h(
                 'div',
@@ -626,6 +629,62 @@ window.__ModuleLoader__.load({
               )
             : null,
         ),
+
+        mobiles.length > 0
+          ? h(
+              'div',
+              { style: DH.card },
+              h(
+                'div',
+                { style: DH.row },
+                h('span', { style: { ...DH.label, color: HP.brand } }, 'Devices'),
+                h('span', { style: { ...DH.sub, marginLeft: 'auto' } }, `${mobiles.length} connected over adb`),
+              ),
+              mobiles.map((device) =>
+                h(
+                  'div',
+                  { key: String(device.serial), style: { display: 'flex', flexDirection: 'column', gap: '5px', paddingTop: '5px', borderTop: `1px solid ${HP.border1}` } },
+                  h(
+                    'div',
+                    { style: DH.row },
+                    h('span', { style: { fontSize: '12px', fontWeight: 600, color: HP.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, String(device.model ?? device.serial)),
+                    h('span', { style: { ...DH.sub, color: HP.sub } }, String(device.serial)),
+                    h('span', { style: { flex: '1 1 auto' } }),
+                    device.battery !== null && typeof device.battery === 'object'
+                      ? h('span', { style: DH.pill(device.battery.charging === true ? HP.ok : HP.warn) }, `${Math.round(Number(device.battery.percent) || 0)}%${device.battery.charging === true ? ' ⚡' : ''}`)
+                      : null,
+                  ),
+                  device.memory !== null && typeof device.memory === 'object'
+                    ? h(
+                        'div',
+                        { style: DH.row },
+                        h('span', { style: DH.rowLabel }, 'RAM'),
+                        h(DhBar, { percent: device.memory.usedPercent, accent: HP.brand }),
+                        h('span', { style: DH.rowValue }, `${hpBytes(device.memory.usedBytes)} used`),
+                      )
+                    : null,
+                  device.storage !== null && typeof device.storage === 'object'
+                    ? h(
+                        'div',
+                        { style: DH.row },
+                        h('span', { style: DH.rowLabel }, 'Disk'),
+                        h(DhBar, { percent: device.storage.usedPercent, tone: dhTone(device.storage.usedPercent, 80, 93) }),
+                        h('span', { style: DH.rowValue }, `${hpBytes(device.storage.freeBytes)} free`),
+                      )
+                    : null,
+                  typeof device.cpuPercent === 'number'
+                    ? h(
+                        'div',
+                        { style: DH.row },
+                        h('span', { style: DH.rowLabel }, 'CPU'),
+                        h(DhBar, { percent: device.cpuPercent, accent: HP.brand }),
+                        h('span', { style: DH.rowValue }, `${device.cpuPercent.toFixed(1)}%`),
+                      )
+                    : null,
+                ),
+              ),
+            )
+          : null,
 
         h(
           'div',
@@ -802,11 +861,13 @@ window.__ModuleLoader__.load({
           : null;
       const batteryPercent = battery !== null && typeof battery.percent === 'number' ? battery.percent : null;
 
+      const mobiles =
+        stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
       const parts = [];
       if (cpuPercent !== null) parts.push(`CPU ${cpuPercent.toFixed(0)}%`);
       if (memPercent !== null) parts.push(`RAM ${memPercent.toFixed(0)}%`);
-      if (diskFree !== null) parts.push(`${hpBytes(diskFree)} free`);
       if (batteryPercent !== null) parts.push(`${battery.charging === true ? 'AC' : 'BAT'} ${batteryPercent.toFixed(0)}%`);
+      if (mobiles.length > 0) parts.push(`${mobiles.length} device${mobiles.length === 1 ? '' : 's'}`);
       if (error !== null) parts.push('offline');
 
       const tone = error !== null ? HP.err : memPercent !== null && memPercent >= 92 ? HP.err : memPercent !== null && memPercent >= 80 ? HP.warn : HP.ok;

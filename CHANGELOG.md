@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- **Mobile health over adb**: `host_stats` reports each connected Android device
+  (model, Android/SDK, memory, `/data` usage, battery/charging/temperature, and
+  CPU from consecutive `/proc/stat` samples). The dropdown renders one compact
+  card per device, and multi-device setups list every device. adb is resolved
+  from `ADB`/`ANDROID_HOME`/SDK paths/`PATH` and every call is bounded.
+- Host snapshot now also covers per-core CPU, every fixed volume, battery, and
+  the process count (Task-Manager-grade numbers).
+- Redesigned dropdown: headline CPU/memory cards, a colourful storage card with
+  every volume, battery/AC, per-core bars, and compact process tables without
+  command lines. The collapsed pill shows CPU, RAM, battery, and device count —
+  no disk storage.
+
 ### Changed
 
 - Redesigned the host-health dropdown as one modern surface: headline CPU /
@@ -25,6 +39,20 @@ All notable changes to this project are documented in this file. The format is b
   user-confirmed kills. The API is absent in headless profiles.
 - Panel API tests: unauthenticated rejection, structured payloads, port/pid kill
   routing, invalid-target refusal, and error shapes.
+
+### Added
+
+- **Mobile health over adb**: `host_stats` reports each connected Android device
+  (model, Android/SDK, memory, `/data` usage, battery/charging/temperature, and
+  CPU from consecutive `/proc/stat` samples). The dropdown renders one compact
+  card per device, and multi-device setups list every device. adb is resolved
+  from `ADB`/`ANDROID_HOME`/SDK paths/`PATH` and every call is bounded.
+- Host snapshot now also covers per-core CPU, every fixed volume, battery, and
+  the process count (Task-Manager-grade numbers).
+- Redesigned dropdown: headline CPU/memory cards, a colourful storage card with
+  every volume, battery/AC, per-core bars, and compact process tables without
+  command lines. The collapsed pill shows CPU, RAM, battery, and device count —
+  no disk storage.
 
 ### Changed
 
@@ -56,6 +84,20 @@ All notable changes to this project are documented in this file. The format is b
 ## [0.1.0] - 2026-11-08
 
 Initial release. Package `@darkmintis/dsh-host-health`, a DeepSeek Harness profile bundle.
+
+### Added
+
+- **Mobile health over adb**: `host_stats` reports each connected Android device
+  (model, Android/SDK, memory, `/data` usage, battery/charging/temperature, and
+  CPU from consecutive `/proc/stat` samples). The dropdown renders one compact
+  card per device, and multi-device setups list every device. adb is resolved
+  from `ADB`/`ANDROID_HOME`/SDK paths/`PATH` and every call is bounded.
+- Host snapshot now also covers per-core CPU, every fixed volume, battery, and
+  the process count (Task-Manager-grade numbers).
+- Redesigned dropdown: headline CPU/memory cards, a colourful storage card with
+  every volume, battery/AC, per-core bars, and compact process tables without
+  command lines. The collapsed pill shows CPU, RAM, battery, and device count —
+  no disk storage.
 
 ### Changed
 
