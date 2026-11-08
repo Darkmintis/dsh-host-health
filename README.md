@@ -81,9 +81,10 @@ These paths are placeholders; add the real captures before the first tagged rele
 
 ## Visual panel
 
-Installing the bundle also adds a compact **usage strip to the Session header
-utilities** (top-right of the chat header, beside the open-in-app, schedule, and
-log-download buttons):
+Installing the bundle also adds a compact **usage strip pinned to the window's
+top strip** (top-right, just left of minimize/maximize/close). It is registered
+in the frame-wide overlay layer, so it stays visible in every Session and
+workspace — chat, settings, and archives alike:
 
 ```
 ● CPU 18% · RAM 74% · 37.5 GB free   ▾

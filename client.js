@@ -800,6 +800,18 @@ window.__ModuleLoader__.load({
       lineHeight: 1,
       cursor: 'pointer',
       whiteSpace: 'nowrap',
+      WebkitAppRegion: 'no-drag',
+      pointerEvents: 'auto',
+    };
+    /** Fixed seat in the window's top strip, left of the native window buttons. */
+    const STRIP_SEAT = {
+      position: 'fixed',
+      top: '8px',
+      right: '156px',
+      zIndex: 3000,
+      display: 'inline-flex',
+      pointerEvents: 'auto',
+      WebkitAppRegion: 'no-drag',
     };
     const STRIP_DOT = (tone) => ({ width: '6px', height: '6px', borderRadius: '50%', background: tone, flex: 'none' });
     const POPOVER = {
@@ -878,7 +890,7 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { ref: rootRef, style: { position: 'relative', display: 'inline-flex' }, 'data-host-health-strip': 'app-bar' },
+        { ref: rootRef, style: STRIP_SEAT, 'data-host-health-strip': 'app-bar' },
         h(
           'button',
           {
@@ -961,13 +973,13 @@ window.__ModuleLoader__.load({
         } catch {
           // Locale is optional; the cards keep their English fallbacks.
         }
-        // Compact app-bar usage strip: it rides the Session header utilities
-        // (next to open-in-app and schedule) so it is visible in the normal chat
-        // layout. Clicking it opens the details popover; the full numbers live
-        // there instead of a separate panel.
-        ctx.slots.inject('conversation.session.header.utilities', () =>
+        // Compact usage strip pinned to the window's top strip (the frame-wide
+        // overlay layer sits above every column, outside scroll containers, so
+        // it is visible for every Session and workspace). Clicking it opens the
+        // details popover; the full numbers live there instead of a panel.
+        ctx.slots.inject('shell.overlay', () =>
           ctx.slots.register(
-            { name: 'conversation.session.header.utilities', id: 'host-health', order: -20, label: 'Host health' },
+            { name: 'shell.overlay', id: 'host-health', order: 100, label: 'Host health' },
             HostUsageWidget,
           ),
         );

@@ -6,8 +6,10 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Added
 
-- **Header usage strip**: a compact CPU/RAM/free-disk readout in the Session
-  header utilities with a one-click, fixed-positioned details popover (overview bars, top
+- **Frame usage strip**: a compact CPU/RAM/free-disk pill pinned to the window's
+  top strip (left of the native window buttons) through the `shell.overlay`
+  layer, visible in every Session and workspace, with a one-click,
+  fixed-positioned details popover (overview bars, top
   processes, ports with kills, stale processes with kills). It polls every three
   seconds, degrades to an `offline` badge when the Host API is unreachable, and
   uses the desktop transport origin when the page is not served from the HTTP host.
