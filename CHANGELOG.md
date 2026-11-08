@@ -21,6 +21,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Fixed
 
+- **Desktop panel API**: the usage strip now resolves its API calls against the page origin. The desktop window runs at `dsh-app://app` and forwards page-relative requests to the Host with its authentication cookie; targeting the loopback HTTP origin directly was cross-origin and left the strip offline.
+
 - `ports_list` on Windows no longer fails when a cold `pwsh` plus `Get-NetTCPConnection` exceeds the probe timeout: the primary listener probe now gets a bounded 15 s timeout and automatically falls back to a bounded `netstat -ano -p tcp` parse. If both probes fail, the tool reports `available: false` with both failure reasons and every flagged port status is `unknown` instead of claiming zero listeners.
 - `port_kill` re-verifies the listener through the same fallback source and refuses with `listener_probe_unavailable` when the listener table cannot be read — it never kills blind.
 - `stale_dev_processes` keeps working without a listener table (no port associations, `process_kill` suggestions only) and says so in `notes`.

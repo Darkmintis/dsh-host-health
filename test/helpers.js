@@ -243,6 +243,12 @@ export function createFakeReact() {
       return { type, props: { ...(props ?? {}), children: children.length === 1 ? children[0] : children } };
     },
     Fragment: Symbol('Fragment'),
+    Component: class Component {
+      constructor(props) {
+        this.props = props;
+        this.state = {};
+      }
+    },
     useState(initial) {
       return [typeof initial === 'function' ? initial() : initial, () => {}];
     },

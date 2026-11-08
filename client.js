@@ -305,23 +305,24 @@ window.__ModuleLoader__.load({
       err: 'var(--dsw-alias-state-error-primary)',
       warn: 'var(--dsw-alias-state-warn-primary)',
       brand: 'var(--dsw-alias-brand-primary)',
+      overlay: 'var(--dsw-alias-bg-overlay)',
     };
     const HP_MONO = 'var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)';
     const HP_SMALL = '11.5px';
 
     /**
-     * Build an absolute API URL from the page base.
-     * @param {string} endpoint API endpoint name.
-     * @returns {string} absolute URL.
+     * Base URL for the Host's panel routes. The page-relative form is the
+     * correct one everywhere: a normal Web page resolves it against its own
+     * HTTP origin, and the desktop shell page (`dsh-app://app`) forwards those
+     * same-origin requests to the owned Host with its authentication cookie
+     * injected. A direct loopback URL would be cross-origin and blocked.
+     * @returns {string} document base URL.
      */
+    function hpApiBase() {
+      return document.baseURI;
+    }
     function hpApiUrl(endpoint) {
-      const transport = typeof window === 'object' && window !== null ? window.__DSH_TRANSPORT__ : undefined;
-      const streamBaseUrl =
-        transport !== null && typeof transport === 'object' && typeof transport.streamBaseUrl === 'string' && transport.streamBaseUrl !== ''
-          ? transport.streamBaseUrl
-          : undefined;
-      const base = streamBaseUrl ?? document.baseURI;
-      return new URL(API_PREFIX + endpoint, base).href;
+      return new URL(API_PREFIX + endpoint, hpApiBase()).href;
     }
 
     /**
@@ -333,7 +334,7 @@ window.__ModuleLoader__.load({
     async function hpFetchJson(url, options = {}) {
       const response = await fetch(url, {
         method: options.method ?? 'GET',
-        credentials: 'same-origin',
+        credentials: 'include',
         headers: options.body === undefined ? undefined : { 'content-type': 'application/json' },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
@@ -784,6 +785,32 @@ window.__ModuleLoader__.load({
     // App-bar usage strip: compact RAM/CPU/disk readout + details popover
     // ------------------------------------------------------------------
 
+    /**
+     * Minimal render guard: a details view that throws still renders the error
+     * text, so the dropdown never appears silently empty.
+     */
+    class HostHealthGuard extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { error };
+      }
+
+      render() {
+        if (this.state.error !== null) {
+          const message = this.state.error instanceof Error ? this.state.error.message : String(this.state.error);
+          return h(
+            'div',
+            { style: { padding: '8px', color: HP.err, fontSize: '11.5px', whiteSpace: 'pre-wrap' } },
+            `Host health view failed: ${message}`,
+          );
+        }
+        return this.props.children;
+      }
+    }
     /** Strip typography and chrome. */
     const STRIP = {
       display: 'inline-flex',
@@ -949,7 +976,12 @@ window.__ModuleLoader__.load({
                   'Close',
                 ),
               ),
-              h(HostHealthPanel, {}),
+              h(
+                HostHealthGuard,
+                null,
+                h(HostHealthPanel, {}),
+              ),
+              error !== null ? h('div', { style: { marginTop: '6px', color: HP.err, fontSize: '11px', whiteSpace: 'pre-wrap' } }, `Host API: ${error}`) : null,
             )
           : null,
       );
