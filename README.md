@@ -79,6 +79,28 @@ Visual capture is intentionally deferred in v0.1.0 (the plugin ships a minimal r
 
 These paths are placeholders; add the real captures before the first tagged release.
 
+## Visual panel
+
+Installing the bundle also adds a **Host health** section to the Web UI: a
+sidebar icon and a main-column panel with live host numbers.
+
+- **Overview** — RAM, CPU, and disk bars, host uptime/cores, GPU status, threshold
+  warnings, and top-RAM/top-CPU tables. It refreshes every few seconds only while
+  the panel is open.
+- **Ports** — TCP listeners with PID and process name, flagged known dev ports,
+  and a per-row **Kill** button.
+- **Stale processes** — leftover dev servers/emulators/Gradle daemons with the
+  reason and suggested tool, plus a **Kill** button.
+- Kill buttons ask for a browser confirmation, then call the same service methods
+  as `port_kill` / `process_kill`, so identity re-verification and protected-PID
+  refusals are identical. The panel requests go through the Host web server and
+  are rejected unless they pass the connection trust fence.
+
+The panel is registered only in profiles that compose the Web server and
+connection services; headless profiles keep the five tools.
+
+> Upgrading a bundle updates the Host half when the app starts, so quit and
+> restart DeepSeek Harness once after installing a new version.
 ## Tool reference
 
 ### `host_stats`

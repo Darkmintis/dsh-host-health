@@ -212,7 +212,11 @@ export function createFakeHostContext() {
     listeners,
     effectLabels,
     ctx: {
-      effect(callback, label) {
+      /** Optional Web services are absent in this test profile. */
+    inject() {
+      return () => {};
+    },
+    effect(callback, label) {
         effectLabels.push(label);
         return callback();
       },

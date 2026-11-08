@@ -281,6 +281,497 @@ window.__ModuleLoader__.load({
       };
     }
 
+    // ------------------------------------------------------------------
+    // Host health panel: main column surface + sidebar entry
+    // ------------------------------------------------------------------
+
+    /** Panel id shared by the `main` key and the `sidebar.panellist` entry. */
+    const PANEL_ID = 'host-health';
+    /** Host HTTP API prefix, resolved against the page base URL. */
+    const API_PREFIX = 'dsh-host-health/api/';
+    /** Overview polling cadence while the panel is open. */
+    const STATS_POLL_MS = 2_500;
+
+    /** Panel palette; theme tokens only. */
+    const HP = {
+      text: 'var(--dsw-alias-label-primary)',
+      sub: 'var(--dsw-alias-label-secondary)',
+      base: 'var(--dsw-alias-bg-base)',
+      layer1: 'var(--dsw-alias-bg-layer-1)',
+      layer2: 'var(--dsw-alias-bg-layer-2)',
+      border1: 'var(--dsw-alias-border-l1)',
+      border2: 'var(--dsw-alias-border-l2)',
+      ok: 'var(--dsw-alias-state-success-primary)',
+      err: 'var(--dsw-alias-state-error-primary)',
+      warn: 'var(--dsw-alias-state-warn-primary)',
+      brand: 'var(--dsw-alias-brand-primary)',
+    };
+    const HP_MONO = 'var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)';
+    const HP_SMALL = '11.5px';
+
+    /**
+     * Build an absolute API URL from the page base.
+     * @param {string} endpoint API endpoint name.
+     * @returns {string} absolute URL.
+     */
+    function hpApiUrl(endpoint) {
+      return new URL(API_PREFIX + endpoint, document.baseURI).href;
+    }
+
+    /**
+     * Fetch one JSON payload with same-origin credentials.
+     * @param {string} url Absolute URL.
+     * @param {{ method?: string, body?: unknown }} [options] Request options.
+     * @returns {Promise<Record<string, any>>} parsed payload.
+     */
+    async function hpFetchJson(url, options = {}) {
+      const response = await fetch(url, {
+        method: options.method ?? 'GET',
+        credentials: 'same-origin',
+        headers: options.body === undefined ? undefined : { 'content-type': 'application/json' },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      });
+      if (response.status === 401 || response.status === 403) throw new Error('This page is not authorized against the Host. Reload the Web UI.');
+      const payload = await response.json().catch(() => null);
+      if (payload === null) throw new Error(`Host returned ${response.status} without JSON.`);
+      if (payload.ok === false) throw new Error(typeof payload.error === 'string' ? payload.error : 'Host request failed.');
+      return payload;
+    }
+
+    /** Panel layout constants. */
+    const HPP = {
+      wrap: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 16px', height: '100%', minHeight: 0, overflow: 'auto', background: HP.base, color: HP.text },
+      header: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
+      title: { fontSize: '15px', fontWeight: 600 },
+      sub: { color: HP.sub, fontSize: HP_SMALL },
+      tabs: { display: 'flex', gap: '4px', flexWrap: 'wrap' },
+      toolbar: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
+      button: { font: 'inherit', fontSize: HP_SMALL, padding: '4px 9px', borderRadius: '6px', border: `1px solid ${HP.border2}`, background: HP.layer2, color: HP.text, cursor: 'pointer' },
+      buttonPrimary: { font: 'inherit', fontSize: HP_SMALL, padding: '4px 9px', borderRadius: '6px', border: `1px solid ${HP.brand}`, background: HP.layer1, color: HP.brand, cursor: 'pointer', fontWeight: 600 },
+      buttonDanger: { font: 'inherit', fontSize: HP_SMALL, padding: '2px 7px', borderRadius: '6px', border: `1px solid ${HP.err}`, background: HP.layer1, color: HP.err, cursor: 'pointer' },
+      card: { display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${HP.border1}`, background: HP.layer1, minWidth: 0 },
+      grid: { display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' },
+      barOuter: { height: '8px', borderRadius: '999px', background: HP.layer2, overflow: 'hidden', border: `1px solid ${HP.border1}` },
+      table: { width: '100%', borderCollapse: 'collapse', fontSize: HP_SMALL },
+      th: { textAlign: 'left', padding: '3px 6px', color: HP.sub, borderBottom: `1px solid ${HP.border1}`, fontWeight: 600 },
+      td: { padding: '3px 6px', borderBottom: `1px solid ${HP.border1}`, color: HP.text, verticalAlign: 'top' },
+      mono: { fontFamily: HP_MONO, fontSize: '11px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+      toast: (tone) => ({ padding: '6px 10px', borderRadius: '6px', border: `1px solid ${tone === 'error' ? HP.err : HP.border2}`, color: tone === 'error' ? HP.err : HP.text, background: HP.layer1, fontSize: HP_SMALL, whiteSpace: 'pre-wrap' }),
+      error: { padding: '6px 10px', borderRadius: '6px', border: `1px solid ${HP.err}`, color: HP.err, background: HP.layer1, fontSize: HP_SMALL },
+      pill: (tone) => ({ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '1px 7px', borderRadius: '999px', border: `1px solid ${tone}`, color: tone, fontSize: '11px', fontWeight: 600 }),
+    };
+
+    /**
+     * Format a byte count.
+     * @param {number} bytes Byte count.
+     * @returns {string} human size.
+     */
+    function hpBytes(bytes) {
+      if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+      }
+      return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+    }
+
+    /**
+     * Format seconds as a compact duration.
+     * @param {number} seconds Seconds.
+     * @returns {string} duration.
+     */
+    function hpUptime(seconds) {
+      if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return '—';
+      const days = Math.floor(seconds / 86_400);
+      const hours = Math.floor((seconds % 86_400) / 3_600);
+      const minutes = Math.floor((seconds % 3_600) / 60);
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
+    }
+
+    /**
+     * Percentage bar.
+     * @param {{ label: string, percent: number, detail?: string }} props Bar props.
+     * @returns {any} metric element.
+     */
+    function HpMetric(props) {
+      const percent = typeof props.percent === 'number' && Number.isFinite(props.percent) ? Math.max(0, Math.min(100, props.percent)) : 0;
+      const tone = percent >= 90 ? HP.err : percent >= 75 ? HP.warn : HP.ok;
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 } },
+        h(
+          'div',
+          { style: { display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: HP_SMALL } },
+          h('span', { style: { fontWeight: 600 } }, props.label),
+          h('span', { style: { color: HP.sub } }, `${percent.toFixed(0)}%${props.detail !== undefined ? ` · ${props.detail}` : ''}`),
+        ),
+        h('div', { style: HPP.barOuter }, h('div', { style: { width: `${percent}%`, height: '100%', background: tone } })),
+      );
+    }
+
+    /**
+     * Compact process table.
+     * @param {{ title: string, processes: any[] }} props Table props.
+     * @returns {any} table element.
+     */
+    function HpProcessTable(props) {
+      const processes = Array.isArray(props.processes) ? props.processes : [];
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 } },
+        h('div', { style: { fontWeight: 600, fontSize: HP_SMALL } }, props.title),
+        processes.length === 0
+          ? h('div', { style: HP.sub }, 'no process data')
+          : h(
+              'table',
+              { style: HPP.table },
+              h('thead', null, h('tr', null, ['Process', 'PID', 'RAM', 'CPU', 'Command'].map((label) => h('th', { key: label, style: HPP.th }, label)))),
+              h(
+                'tbody',
+                null,
+                processes.map((process) =>
+                  h(
+                    'tr',
+                    { key: String(process.pid) },
+                    h('td', { style: HPP.td }, String(process.name ?? '?')),
+                    h('td', { style: HPP.td }, String(process.pid ?? '?')),
+                    h('td', { style: HPP.td }, typeof process.ramMb === 'number' ? `${Math.round(process.ramMb)} MB` : hpBytes(process.ramBytes)),
+                    h('td', { style: HPP.td }, typeof process.cpuPercent === 'number' ? `${process.cpuPercent.toFixed(1)}%` : '—'),
+                    h('td', { ...HPP.td, ...HPP.mono }, String(process.commandLine ?? '').slice(0, 160)),
+                  ),
+                ),
+              ),
+            ),
+      );
+    }
+
+    /**
+     * Overview tab.
+     * @param {{ stats: any }} props Tab props.
+     * @returns {any} tab element.
+     */
+    function HpOverview(props) {
+      const stats = props.stats;
+      if (stats === null) return h('div', { style: HP.sub }, 'Loading host stats…');
+      const host = stats.host ?? {};
+      const memory = stats.memory ?? {};
+      const cpu = stats.cpu ?? {};
+      const disk = stats.disk ?? {};
+      const warnings = Array.isArray(stats.warnings) ? stats.warnings : [];
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        h(
+          'div',
+          { style: HPP.card },
+          h('div', { style: { fontWeight: 600 } }, `${host.hostname ?? 'host'} · ${host.platform ?? '?'} ${host.arch ?? ''}`),
+          h('div', { style: HP.sub }, `up ${hpUptime(host.uptimeSeconds)} · ${host.cpuCount ?? '?'} logical cores · plugin v${String(stats.pluginVersion ?? '?')}`),
+          h(HpMetric, {
+            label: 'RAM',
+            percent: typeof memory.usedPercent === 'number' ? memory.usedPercent : 0,
+            detail: `${hpBytes(memory.usedBytes)} / ${hpBytes(memory.totalBytes)}`,
+          }),
+          h(HpMetric, { label: 'CPU', percent: typeof cpu.percent === 'number' ? cpu.percent : 0, detail: `${host.cpuCount ?? '?'} cores` }),
+          h(HpMetric, {
+            label: 'Disk',
+            percent: typeof disk.freePercent === 'number' ? 100 - disk.freePercent : 0,
+            detail: `${hpBytes(disk.freeBytes)} free${typeof disk.path === 'string' ? ` on ${disk.path}` : ''}`,
+          }),
+          stats.gpuStatus === 'available' && stats.gpu !== null
+            ? h('div', { style: HP.sub }, `GPU: ${String(stats.gpu.name ?? 'GPU')}${typeof stats.gpu.utilizationPercent === 'number' ? ` · ${stats.gpu.utilizationPercent}%` : ''}${typeof stats.gpu.vramUsedMb === 'number' ? ` · ${stats.gpu.vramUsedMb}/${stats.gpu.vramTotalMb} MB VRAM` : ''}`)
+            : h('div', { style: HP.sub }, 'GPU: not available (nvidia-smi not found or no supported GPU)'),
+          warnings.length > 0
+            ? h(
+                'div',
+                { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' } },
+                warnings.map((warning, index) => h('div', { key: String(index), style: { color: HP.warn, fontSize: HP_SMALL } }, `⚠ ${String(warning.message ?? warning.code ?? 'warning')}`)),
+              )
+            : null,
+        ),
+        h('div', { style: HPP.grid }, h('div', { style: HPP.card }, h(HpProcessTable, { title: 'Top RAM', processes: stats.topRam })), h('div', { style: HPP.card }, h(HpProcessTable, { title: 'Top CPU', processes: stats.topCpu }))),
+        h(
+          'details',
+          { style: HPP.card },
+          h('summary', { style: { cursor: 'pointer', fontSize: HP_SMALL, color: HP.sub } }, 'Raw text'),
+          h('pre', { style: { ...HPP.mono, margin: '6px 0 0' } }, String(props.text ?? '')),
+        ),
+      );
+    }
+
+    /**
+     * Ports tab.
+     * @param {{ ports: any, busy: any, onKill: Function }} props Tab props.
+     * @returns {any} tab element.
+     */
+    function HpPorts(props) {
+      const ports = props.ports;
+      if (ports === null) return h('div', { style: HP.sub }, 'Reading listeners…');
+      const listeners = Array.isArray(ports.listeners) ? ports.listeners : [];
+      const flagged = Array.isArray(ports.flagged) ? ports.flagged : [];
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        ports.available === false ? h('div', { style: HPP.error }, `Listener table unavailable. ${Array.isArray(ports.notes) ? ports.notes.join(' ') : ''}`) : null,
+        h(
+          'div',
+          { style: HPP.card },
+          h('div', { style: { fontWeight: 600 } }, `TCP listeners${typeof ports.source === 'string' ? ` (${ports.source})` : ''}`),
+          listeners.length === 0
+            ? h('div', { style: HP.sub }, 'No enumerable TCP listener.')
+            : h(
+                'table',
+                { style: HPP.table },
+                h('thead', null, h('tr', null, ['Port', 'Address', 'PID', 'Process', 'Known dev port', ''].map((label) => h('th', { key: label, style: HPP.th }, label)))),
+                h(
+                  'tbody',
+                  null,
+                  listeners.map((listener) =>
+                    h(
+                      'tr',
+                      { key: `${listener.port}-${listener.pid}-${listener.address}` },
+                      h('td', { style: { ...HPP.td, ...HPP.mono } }, String(listener.port)),
+                      h('td', { style: { ...HPP.td, ...HPP.mono } }, String(listener.address ?? '')),
+                      h('td', { style: HPP.td }, String(listener.pid ?? '?')),
+                      h('td', { style: HPP.td }, String(listener.name ?? 'unknown')),
+                      h('td', { style: HPP.td }, listener.knownDevPort === true ? String(listener.devLabel ?? 'yes') : ''),
+                      h(
+                        'td',
+                        { style: HPP.td },
+                        typeof listener.pid === 'number' && listener.pid > 0
+                          ? h(
+                              'button',
+                              {
+                                type: 'button',
+                                style: HPP.buttonDanger,
+                                disabled: props.busy !== null,
+                                onClick: () =>
+                                  window.confirm(`Kill ${String(listener.name ?? 'process')} (pid ${String(listener.pid)}) listening on port ${String(listener.port)}?`)
+                                    ? props.onKill({ port: listener.port })
+                                    : undefined,
+                              },
+                              'Kill',
+                            )
+                          : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+        ),
+        h(
+          'div',
+          { style: HPP.card },
+          h('div', { style: { fontWeight: 600 } }, 'Flagged dev ports'),
+          h(
+            'div',
+            { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+            flagged.map((entry) =>
+              h(
+                'span',
+                { key: String(entry.port), style: HPP.pill(entry.status === 'in_use' ? HP.warn : HP.sub) },
+                `${String(entry.port)} ${String(entry.status ?? '?')}${entry.name !== null && entry.name !== undefined ? ` · ${String(entry.name)}` : ''}${entry.devLabel !== undefined ? ` (${String(entry.devLabel)})` : ''}`,
+              ),
+            ),
+          ),
+        ),
+        Array.isArray(ports.warnings) && ports.warnings.length > 0
+          ? h(
+              'div',
+              { style: HPP.card },
+              ports.warnings.map((warning, index) => h('div', { key: String(index), style: { color: HP.warn, fontSize: HP_SMALL } }, String(warning.message ?? warning.code ?? 'warning'))),
+            )
+          : null,
+      );
+    }
+
+    /**
+     * Stale-process tab.
+     * @param {{ stale: any, busy: any, onKill: Function }} props Tab props.
+     * @returns {any} tab element.
+     */
+    function HpStale(props) {
+      const stale = props.stale;
+      if (stale === null) return h('div', { style: HP.sub }, 'Scanning dev processes…');
+      const entries = Array.isArray(stale.entries) ? stale.entries : [];
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        h('div', { style: HP.sub }, `${entries.length} candidate(s) · stale threshold ${String(stale.staleAfterMinutes ?? '?')} min`),
+        entries.length === 0
+          ? h('div', { style: HPP.card }, 'No leftover dev servers, emulators, or Gradle daemons detected.')
+          : entries.map((entry) => {
+              const suggested = entry.suggested !== null && typeof entry.suggested === 'object' ? entry.suggested : undefined;
+              const args = suggested !== undefined && suggested.args !== null && typeof suggested.args === 'object' ? suggested.args : undefined;
+              const target = args !== undefined && typeof args.port === 'number' ? { port: args.port } : args !== undefined && typeof args.pid === 'number' ? { pid: args.pid } : undefined;
+              return h(
+                'div',
+                { key: `${String(entry.pid)}-${String(entry.category)}`, style: HPP.card },
+                h(
+                  'div',
+                  { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                  h('span', { style: HPP.pill(entry.stale === true ? HP.warn : HP.sub) }, `${entry.stale === true ? 'STALE' : 'candidate'}/${String(entry.confidence ?? 'low')}`),
+                  h('span', { style: { fontWeight: 600 } }, String(entry.label ?? entry.category ?? 'process')),
+                  h('span', { style: HP.sub }, `${String(entry.name ?? '?')} · pid ${String(entry.pid)}${typeof entry.port === 'number' ? ` · port ${entry.port}` : ''}${typeof entry.ageMinutes === 'number' ? ` · ${Math.round(entry.ageMinutes)} min` : ''}`),
+                  h('span', { style: { flex: '1 1 auto' } }),
+                  target !== undefined
+                    ? h(
+                        'button',
+                        {
+                          type: 'button',
+                          style: HPP.buttonDanger,
+                          disabled: props.busy !== null,
+                          onClick: () => window.confirm(`Kill ${String(entry.name ?? 'process')} (pid ${String(entry.pid)})?`) && props.onKill(target),
+                        },
+                        'Kill',
+                      )
+                    : null,
+                ),
+                h('div', { style: { ...HP.sub, fontSize: HP_SMALL } }, String(entry.reason ?? '')),
+                suggested !== undefined ? h('div', { style: { ...HP.sub, fontSize: HP_SMALL, ...HPP.mono } }, `next: ${String(suggested.tool)}(${JSON.stringify(suggested.args ?? {})})`) : null,
+              );
+            }),
+      );
+    }
+
+    /**
+     * The main Host health panel.
+     * @param {Record<string, any>} props Slot props.
+     * @returns {any} panel element.
+     */
+    function HostHealthPanel(props) {
+      const { useState, useEffect, useCallback } = React;
+      const [tab, setTab] = useState('overview');
+      const [stats, setStats] = useState(null);
+      const [statsText, setStatsText] = useState('');
+      const [ports, setPorts] = useState(null);
+      const [stale, setStale] = useState(null);
+      const [error, setError] = useState(null);
+      const [busy, setBusy] = useState(null);
+      const [toast, setToast] = useState(null);
+
+      const loadStats = useCallback(async () => {
+        try {
+          const payload = await hpFetchJson(hpApiUrl('stats'));
+          setStats(payload.value ?? null);
+          setStatsText(String(payload.text ?? ''));
+          setError(null);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      }, []);
+
+      const loadPorts = useCallback(async () => {
+        try {
+          const payload = await hpFetchJson(hpApiUrl('ports'));
+          setPorts(payload.value ?? null);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      }, []);
+
+      const loadStale = useCallback(async () => {
+        try {
+          const payload = await hpFetchJson(hpApiUrl('stale'));
+          setStale(payload.value ?? null);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      }, []);
+
+      useEffect(() => {
+        loadStats();
+        const timer = setInterval(() => loadStats(), STATS_POLL_MS);
+        return () => clearInterval(timer);
+      }, [loadStats]);
+
+      useEffect(() => {
+        if (tab === 'ports') loadPorts();
+        if (tab === 'stale') loadStale();
+      }, [tab, loadPorts, loadStale]);
+
+      useEffect(() => {
+        if (toast === null) return undefined;
+        const timer = setTimeout(() => setToast(null), 6_000);
+        return () => clearTimeout(timer);
+      }, [toast]);
+
+      const killTarget = useCallback(
+        async (target) => {
+          setBusy('kill');
+          try {
+            const payload = await hpFetchJson(hpApiUrl('kill'), { method: 'POST', body: target });
+            setToast({ tone: 'ok', text: String(payload.text ?? 'kill finished') });
+            if (tab === 'ports') await loadPorts();
+            if (tab === 'stale') await loadStale();
+          } catch (cause) {
+            setToast({ tone: 'error', text: cause instanceof Error ? cause.message : String(cause) });
+          } finally {
+            setBusy(null);
+          }
+        },
+        [tab, loadPorts, loadStale],
+      );
+
+      return h(
+        'div',
+        { 'data-host-health-panel': 'main', style: HPP.wrap },
+        h(
+          'div',
+          { style: HPP.header },
+          h('span', { style: HPP.title }, 'Host health'),
+          h('span', { style: HPP.sub }, stats === null ? 'loading…' : `${String(stats.host?.hostname ?? 'host')} · up ${hpUptime(stats.host?.uptimeSeconds)}`),
+          h('span', { style: { flex: '1 1 auto' } }),
+          h('button', { type: 'button', style: HPP.button, onClick: () => (tab === 'ports' ? loadPorts() : tab === 'stale' ? loadStale() : loadStats()), disabled: busy !== null }, 'Refresh'),
+        ),
+        h(
+          'div',
+          { style: HPP.tabs },
+          [
+            ['overview', 'Overview'],
+            ['ports', 'Ports'],
+            ['stale', 'Stale processes'],
+          ].map(([id, label]) => h('button', { key: id, type: 'button', style: tab === id ? HPP.buttonPrimary : HPP.button, onClick: () => setTab(id) }, label)),
+        ),
+        error !== null ? h('div', { style: HPP.error }, error) : null,
+        toast !== null ? h('div', { style: HPP.toast(toast.tone) }, toast.text) : null,
+        tab === 'overview' ? h(HpOverview, { stats, text: statsText }) : null,
+        tab === 'ports' ? h(HpPorts, { ports, busy, onKill: killTarget }) : null,
+        tab === 'stale' ? h(HpStale, { stale, busy, onKill: killTarget }) : null,
+      );
+    }
+
+    /**
+     * Sidebar icon for the Host health panel.
+     * @param {{ size?: number, active?: boolean }} props Icon props.
+     * @returns {any} svg element.
+     */
+    function HostHealthIcon(props) {
+      const iconProps = props ?? {};
+      const size = typeof iconProps.size === 'number' && iconProps.size > 0 ? iconProps.size : 20;
+      return h(
+        'svg',
+        {
+          width: size,
+          height: size,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.7,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          'aria-hidden': true,
+          style: { color: iconProps.active === true ? HP.text : HP.sub, display: 'block' },
+        },
+        h('path', { d: 'M3 13h4l2.5-6 3 12 2.5-8 2 2h4' }),
+        h('path', { d: 'M3 20h18' }),
+      );
+    }
+
     const cards = ['host_stats', 'ports_list', 'stale_dev_processes', 'port_kill', 'process_kill'];
 
     return {
@@ -299,6 +790,16 @@ window.__ModuleLoader__.load({
         } catch {
           // Locale is optional; the cards keep their English fallbacks.
         }
+        // Visible cockpit: a main-column panel plus the sidebar entry that
+        // addresses it by the same id.
+        ctx.slots.inject('sidebar.panellist', () =>
+          ctx.slots.register(
+            { name: 'sidebar.panellist', id: PANEL_ID, order: 20, label: 'Host health' },
+            HostHealthIcon,
+          ),
+        );
+        ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, HostHealthPanel));
+
         for (const key of cards) {
           ctx.slots.inject('tool.call.toolview', () =>
             ctx.slots.register(

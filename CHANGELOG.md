@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- **Host health panel**: a sidebar entry and main-column panel with live RAM/CPU/
+  disk bars, uptime, GPU status, threshold warnings, top-RAM/top-CPU tables, a
+  ports table with per-row kills, and a stale-dev-process list with kills.
+- **Panel HTTP API** (`/dsh-host-health/api/`) registered through the Web server
+  and admitted by the connection trust fence: stats, ports, stale processes, and
+  user-confirmed kills. The API is absent in headless profiles.
+- Panel API tests: unauthenticated rejection, structured payloads, port/pid kill
+  routing, invalid-target refusal, and error shapes.
+
 ### Fixed
 
 - `ports_list` on Windows no longer fails when a cold `pwsh` plus `Get-NetTCPConnection` exceeds the probe timeout: the primary listener probe now gets a bounded 15 s timeout and automatically falls back to a bounded `netstat -ano -p tcp` parse. If both probes fail, the tool reports `available: false` with both failure reasons and every flagged port status is `unknown` instead of claiming zero listeners.

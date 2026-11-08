@@ -106,12 +106,17 @@ test('client module declares the expected id and read-only card registrations', 
   });
   assert.deepEqual(Array.from(module.inject), ['slots']);
   const { registrations, injectedSlots } = installClient(module);
-  assert.equal(registrations.length, 5);
-  assert.equal(injectedSlots.length, 5);
-  for (const slot of injectedSlots) assert.equal(slot, 'tool.call.toolview');
-  const keys = registrations.map((registration) => registration.options.key);
+  const cards = registrations.filter((registration) => registration.options.name === 'tool.call.toolview');
+  assert.equal(cards.length, 5);
+  assert.deepEqual([...injectedSlots].sort(), ['main', 'sidebar.panellist', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
+  const main = registrations.find((registration) => registration.options.name === 'main');
+  assert.equal(main?.options.key, 'host-health', 'main panel key matches the panel id');
+  const sidebar = registrations.find((registration) => registration.options.name === 'sidebar.panellist');
+  assert.equal(sidebar?.options.id, 'host-health', 'sidebar entry addresses the main panel');
+  assert.equal(typeof sidebar?.component, 'function');
+  const keys = cards.map((registration) => registration.options.key);
   assert.deepEqual(keys, ['host_stats', 'ports_list', 'stale_dev_processes', 'port_kill', 'process_kill']);
-  for (const registration of registrations) {
+  for (const registration of cards) {
     assert.equal(registration.options.name, 'tool.call.toolview');
     assert.equal(registration.options.locale, 'host-health');
     assert.equal(typeof registration.component, 'function');
@@ -121,6 +126,7 @@ test('client module declares the expected id and read-only card registrations', 
 test('card components never throw on missing or malformed props', () => {
   const module = loadClientModule().factory(() => createFakeReact());
   const { registrations } = installClient(module);
+  const cards = registrations.filter((registration) => registration.options.name === 'tool.call.toolview');
   const weirdProps = [
     null,
     undefined,
@@ -133,7 +139,7 @@ test('card components never throw on missing or malformed props', () => {
     { phase: 'result', block: { kind: 'error', content: [{ type: 'text', text: 'Error: boom' }], isError: true, call: { argsRaw: '{"pid":1}' } } },
     { phase: 'result', block: { kind: 'success', content: [], error: { code: 'interrupted' }, call: null } },
   ];
-  for (const registration of registrations) {
+  for (const registration of cards) {
     for (const props of weirdProps) {
       assert.doesNotThrow(() => registration.component(props));
     }

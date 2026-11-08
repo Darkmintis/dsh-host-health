@@ -15,6 +15,7 @@ import { createCommandRunner } from './lib/command.js';
 import { createNodeSystem } from './lib/system.js';
 import { createProbes } from './lib/probes.js';
 import { createProcessControl } from './lib/kill.js';
+import { registerHostHealthApi } from './lib/api.js';
 import { createHostService } from './lib/service.js';
 import { createToolDefinitions } from './lib/tools.js';
 
@@ -29,6 +30,7 @@ export const name = '@darkmintis/dsh-host-health';
  * @typedef {object} HostContext
  * @property {(callback: () => unknown, label?: string) => unknown} effect
  * @property {(event: string, listener: (exec: Record<string, any>, next: () => Promise<any>) => Promise<any>) => unknown} on
+ * @property {(dependencies: string[], callback: (ctx: any) => unknown) => unknown} inject
  * @property {{ register: (definition: Record<string, any>) => unknown }} tools
  */
 
@@ -115,6 +117,12 @@ export function apply(ctx, config = {}) {
   for (const definition of createToolDefinitions(service)) {
     ctx.effect(() => ctx.tools.register(definition), `host-health: register ${definition.name}`);
   }
+
+  // The panel API only exists where the Web composition provides a browser
+  // carrier and its trust fence; headless profiles keep the tools only.
+  ctx.inject(['webServer', 'connection'], (/** @type {any} */ apiCtx) => {
+    registerHostHealthApi(apiCtx, service);
+  });
 
   ctx.on('tools/pre-execute', async (exec, next) => {
     const toolName = typeof exec.name === 'string' ? exec.name : '';

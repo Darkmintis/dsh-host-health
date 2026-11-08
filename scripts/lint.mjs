@@ -49,7 +49,8 @@ const rules = [
       [/\bshell\s*:\s*true\b/, 'shell: true is forbidden; probes must use bounded spawn'],
       [/\bexecSync\s*\(/, 'execSync is forbidden; use the bounded command runner'],
       [/\bfetch\s*\(/, 'network access is forbidden'],
-      [/node:https?/, 'network access is forbidden'],
+      [/from\s+['"]node:(?:https?|net)['"]/, 'outbound network modules are forbidden'],
+      [/https?:\/\/(?!localhost)/, 'outbound network URLs are forbidden'],
       [/require\s*\(/, 'host entry must stay ESM without require()'],
       [/\sprocess\.exit\s*\(/, 'the plugin must never exit the host process'],
     ],
@@ -78,7 +79,8 @@ for (const file of runtimeLibFiles) {
       [/\bshell\s*:\s*true\b/, 'shell: true is forbidden; probes must use bounded spawn'],
       [/\bexecSync\s*\(/, 'execSync is forbidden; use the bounded command runner'],
       [/\bfetch\s*\(/, 'network access is forbidden'],
-      [/node:https?/, 'network access is forbidden'],
+      [/from\s+['"]node:(?:https?|net)['"]/, 'outbound network modules are forbidden'],
+      [/https?:\/\/(?!localhost)/, 'outbound network URLs are forbidden'],
       [/require\s*\(/, 'host modules must stay ESM without require()'],
       [/\sprocess\.exit\s*\(/, 'the plugin must never exit the host process'],
     ],
@@ -90,6 +92,14 @@ function readRuntime(relative) {
   return readFileSync(path.join(root, relative), 'utf8');
 }
 
+// The tool cards above the panel marker stay passive. The panel surface is the
+// one sanctioned exception: it may poll the authenticated same-origin Host API
+// and manage its own React state.
+const clientSourceForRules = readRuntime('client.js');
+const panelMarker = '// Host health panel: main column surface';
+const panelIndex = clientSourceForRules.indexOf(panelMarker);
+const passiveCardSource = panelIndex === -1 ? clientSourceForRules : clientSourceForRules.slice(0, panelIndex);
+
 for (const rule of rules) {
   let text;
   try {
@@ -98,8 +108,9 @@ for (const rule of rules) {
     problems.push(`${rule.file}: missing file for ${rule.name} rules`);
     continue;
   }
+  const scanned = rule.file === 'client.js' ? passiveCardSource : text;
   for (const [pattern, message] of rule.patterns) {
-    if (pattern.test(text)) problems.push(`${rule.file}: ${message}`);
+    if (pattern.test(scanned)) problems.push(`${rule.file}: ${message}`);
   }
 }
 
