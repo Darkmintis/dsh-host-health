@@ -48,6 +48,7 @@ Notes:
 
 - The bundle manifest is `package.json` with `dsh.bundle.patch`; the client card set is exported as `./client` and loaded by the Web UI. A Host-only session without the Web Client still gets every tool.
 - The optional row `config` is `{}`. v0.1.0 accepts these optional overrides, all with safe defaults: `cacheTtlMs`, `staleAfterMinutes`, `maxProcesses`, `maxStaleEntries`, and `thresholds.ramPercent` / `thresholds.diskFreeBytes` / `thresholds.diskFreePercent`. They are read defensively and are not schema-validated in this release.
+- **Restart DSH after installing or replacing the package.** Host plugin JavaScript is loaded once per DSH process; a page reload or client HMR only reloads the Web Client half. Every Host tool result includes `pluginVersion` so you can confirm the running generation.
 - `npm publish` is intentionally **not** part of v0.1.0.
 
 ## Security and permissions
@@ -90,6 +91,7 @@ Snapshot host resources, top processes, and dev highlights. Read-only.
 ```json
 {
   "ok": true,
+  "pluginVersion": "0.1.0",
   "host": { "hostname": "dev-box", "platform": "win32", "arch": "x64", "cpuCount": 16, "uptimeSeconds": 57020 },
   "memory": { "usedBytes": 14323601408, "totalBytes": 16441667584, "usedPercent": 87.1 },
   "cpu": { "percent": 12.3 },
@@ -112,12 +114,14 @@ List TCP listeners and flag known dev ports plus any requested ones. Read-only.
 
 - Arguments: `{}` or `{ "ports": [8787, 3000] }` (extra ports to flag, integers 1–65535).
 - Known dev ports always flagged: **8787** (web preview), **5554** (Android emulator console), **8000** (local HTTP server), **5173** (Vite dev server), **53365** (DeepSeek Harness Web UI).
-- Listener sources: bounded `Get-NetTCPConnection` (15 s) with an automatic bounded `netstat -ano -p tcp` fallback on Windows; `ss`/`lsof` on macOS/Linux. When every listener probe fails, the result has `available: false` and every flagged port status is `unknown` — the tool never claims there are zero listeners.
+- Listener sources: bounded `Get-NetTCPConnection` (15 s) with an automatic bounded `netstat -ano -p tcp` fallback on Windows; `ss`/`lsof` on macOS/Linux. When every listener probe fails, the result has `available: false` and every flagged port status is `unknown` — the tool never claims there are zero listeners. The result’s `source` field (`powershell`/`netstat`/`ss`/`lsof`) shows which table supplied the data.
+- `FREE` means **no enumerable listener**, not “the port is bindable”. A port can be genuinely bound and serving while all host enumeration APIs hide it (Windows network compartments, WSL/container boundaries, VPN/filter drivers, or security software). The plugin does not probe with a network connect and never kills a process it cannot identify; see Troubleshooting.
 - Example result (abbreviated):
 
 ```json
 {
   "ok": true,
+  "pluginVersion": "0.1.0",
   "available": true,
   "source": "powershell",
   "listeners": [{ "port": 5173, "address": "127.0.0.1", "pid": 1234, "name": "node.exe", "knownDevPort": true, "devLabel": "Vite dev server" }],
@@ -138,14 +142,18 @@ Detect leftover dev tooling and explain it. Read-only.
 
 - Arguments: `{}`.
 - Returns candidates with `category`, `label`, `port`, `ageMinutes`, `stale`, `confidence` (`high`/`medium`/`low`), a `reason`, and a `suggested` target (`port_kill` or `process_kill`) that still requires approval.
+- Listener data comes from the same bounded probe path as `ports_list` (15 s PowerShell bound → `netstat` fallback), and a listener snapshot cached by a recent `ports_list` is reused when still fresh. Results carry `listenerProbeAvailable` and `listenerSource`; when the table is unavailable, entries have no `port` and suggest `process_kill` only.
 - Heuristics: Gradle daemons older than 180 min are stale; preview servers older than 30 min are stale; Flutter/Dart runs and emulators are reported as candidates with explicit caveats (an emulator may be intentionally running). The Harness host process is never a candidate.
 - Example result (abbreviated):
 
 ```json
 {
   "ok": true,
+  "pluginVersion": "0.1.0",
   "staleAfterMinutes": 30,
   "count": 1,
+  "listenerProbeAvailable": true,
+  "listenerSource": "netstat",
   "entries": [{
     "pid": 1234,
     "name": "node.exe",
@@ -210,7 +218,9 @@ macOS/Linux support is implemented and unit-tested against captured fixtures but
 - **`process_table_unavailable: ... no PowerShell executable available`** — Windows needs `pwsh` (PowerShell 7+) or `powershell.exe` on `PATH`. Install PowerShell 7 or add Windows PowerShell to `PATH`.
 - **`listener_probe_unavailable`** — both the bounded `Get-NetTCPConnection` probe (15 s) and the bounded `netstat -ano -p tcp` fallback failed (or, on macOS/Linux, both `ss` and `lsof` failed). `ports_list` reports `available: false` with “probe unavailable”, not “0 listeners”; `stale_dev_processes` continues without port associations; `port_kill` refuses because it cannot re-verify the target. `host_stats` remains unaffected.
 - **`listener_probe_fallback` note** — the primary listener probe timed out or failed, so the bounded `netstat` fallback supplied the table. This is expected on slow machines where a cold `pwsh` plus `Get-NetTCPConnection` exceeds the 15 s bound; subsequent probes reuse the fallback source.
+- **`FREE` is not proof the port is bindable** — a genuinely bound port can be hidden from every host enumeration API (`netstat -ano -p tcp`, `Get-NetTCPConnection`) by Windows network compartments, WSL/container boundaries, VPN/filter drivers, or security software, while a TCP connect still succeeds and a bind returns `EADDRINUSE`. `ports_list`/`stale_dev_processes` report only what the OS lets them enumerate (`source` tells you which table was used); `port_kill` refuses with `no_listener`/`listener_probe_unavailable` instead of killing a process it cannot identify. If you can reproduce a bound-but-invisible listener, capture `ports_list`, its `notes`, a raw connect, and the owning process from an elevated Task Manager/Resource Monitor and report it — this is an OS observation limit, not a plugin capability to work around safely.
 - **GPU shows `null` / `GPU: not available`** — no `nvidia-smi` on `PATH` or no NVIDIA GPU. This is never an error; `gpuStatus` reports `"unavailable"` and the line is explicit instead of silently missing.
+- **`gpuStatus`/`pluginVersion` fields or the GPU line are missing entirely** — the running Host module generation predates them. Installing/replacing a bundle does not reload Host JavaScript in a live DSH process: a full DSH restart is required (a page reload or client HMR only reloads the `client.js` half). After reinstalling, restart DSH and confirm `host_stats` contains `"pluginVersion": "0.1.0"` and `"gpuStatus"`.
 - **`ambiguous_listener`** — more than one distinct PID listens on the port (for example an IPv4 forwarder and a different IPv6 process). Inspect `ports_list` and use `process_kill` with the intended PID.
 - **`identity_changed` / `process_not_found`** — the process exited or the PID was reused between approval and the kill. Re-run `ports_list`/`stale_dev_processes`; nothing was killed.
 - **`access_denied`** — the target is elevated or owned by another user. The plugin deliberately does not request admin rights.

@@ -120,6 +120,8 @@ test('ports_list and stale_dev_processes render their tables', async () => {
     createFakeService({
       portsList: {
         ok: true,
+        available: true,
+        source: 'powershell',
         listeners: [{ port: 5173, address: '127.0.0.1', pid: 100, name: 'node.exe', knownDevPort: true, devLabel: 'Vite dev server' }],
         flagged: [{ port: 5173, status: 'in_use', pid: 100, name: 'node.exe', knownDevPort: true, devLabel: 'Vite dev server' }],
         warnings: [{ code: 'port_in_use', severity: 'warn', message: 'Port 5173 (Vite dev server) is in use by node.exe (pid 100).' }],
@@ -128,6 +130,8 @@ test('ports_list and stale_dev_processes render their tables', async () => {
       staleDevProcesses: {
         ok: true,
         staleAfterMinutes: 30,
+        listenerProbeAvailable: true,
+        listenerSource: 'netstat',
         entries: [
           {
             pid: 100,
@@ -151,11 +155,12 @@ test('ports_list and stale_dev_processes render their tables', async () => {
   assert.ok(ports);
   assert.ok(stale);
   const portsText = renderText(ports.output.render({ ports: [3000] }, await ports.execute({ ports: [3000] })));
-  assert.match(portsText, /TCP listeners: 1/);
+  assert.match(portsText, /TCP listeners \(powershell\): 1/);
   assert.match(portsText, /\[dev: Vite dev server\]/);
   assert.match(portsText, /IN USE/);
   const staleText = renderText(stale.output.render({}, await stale.execute({})));
   assert.match(staleText, /STALE\/high/);
+  assert.match(staleText, /listener source: netstat/);
   assert.match(staleText, /port_kill\(\{"port":8787\}\)/);
 });
 

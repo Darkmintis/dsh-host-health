@@ -10,6 +10,9 @@ All notable changes to this project are documented in this file. The format is b
 - `port_kill` re-verifies the listener through the same fallback source and refuses with `listener_probe_unavailable` when the listener table cannot be read — it never kills blind.
 - `stale_dev_processes` keeps working without a listener table (no port associations, `process_kill` suggestions only) and says so in `notes`.
 - `host_stats` renders an explicit `GPU: not available` line (`gpuStatus: "unavailable"`) when `nvidia-smi` is absent instead of silently omitting the GPU row.
+- `stale_dev_processes` now shares the same listener probe path as `ports_list` (15 s bounded PowerShell probe + `netstat` fallback), reads the listener snapshot before the slower process probe so a recent `ports_list` cache is reused, attaches ports to candidates, and reports `listenerProbeAvailable`/`listenerSource`. When the listener table is genuinely unavailable, candidates suggest `process_kill` only.
+- Every Host tool result now includes `pluginVersion` so a stale Host module generation (package replaced without a full DSH restart) is detectable from tool output.
+- Documented that `FREE` means “no enumerable listener”, not “bindable”: a port can be bound and serving yet hidden from all host enumeration (network compartments, WSL/container boundaries, security software). `port_kill` continues to refuse rather than kill blind.
 
 ## [0.1.0] - 2026-11-08
 

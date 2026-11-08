@@ -21,7 +21,7 @@
 
 - Resource counters from Node builtins: total/free RAM, aggregate CPU times, disk capacity of the system root, uptime, load average.
 - The host process table: PID, parent PID, name, working-set bytes, cumulative CPU time, creation time, and command line (truncated to 400 characters when stored; 160 characters shown in output).
-- The TCP listener table: local address, port, owning PID.
+- The TCP listener table: local address, port, owning PID. Enumeration is best-effort and may be incomplete: a genuinely bound port can be hidden from all host enumeration APIs (Windows network compartments, WSL/container boundaries, VPN/filter drivers, security software). `FREE` therefore means “no enumerable listener”, never “bindable”, and the plugin never kills a process it cannot identify from a fresh listener/process re-check.
 - Optionally, local GPU counters from `nvidia-smi`.
 - A local command line may contain sensitive arguments (paths, tokens passed as CLI flags). The plugin only displays it to the requesting agent/user as tool output; it does not transmit it anywhere. Avoid passing secrets on command lines if tool output may be shared.
 

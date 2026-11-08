@@ -77,6 +77,7 @@ test('hostStats assembles host fields, CPU deltas, top lists, highlights, and th
   });
   const value = await service.hostStats({ includeGpu: true });
   assert.equal(value.ok, true);
+  assert.equal(value.pluginVersion, '0.1.0');
   assert.equal(value.host.hostname, 'test-host');
   assert.equal(value.host.platform, 'win32');
   assert.equal(value.host.cpuCount, 4);
@@ -181,6 +182,7 @@ test('portsList lists listeners, joins names, and flags known and requested port
   assert.equal(value.ok, true);
   assert.equal(value.available, true);
   assert.equal(value.source, 'powershell');
+  assert.equal(value.pluginVersion, '0.1.0');
   assert.deepEqual(value.listeners.map((listener) => listener.port), [3000, 5173, 8787]);
   assert.equal(value.listeners[0].name, 'python.exe');
   assert.equal(value.knownDevPorts.length, 5);
@@ -278,6 +280,7 @@ test('staleDevProcesses classifies leftover dev processes with suggested targets
   const value = await service.staleDevProcesses();
   assert.equal(value.ok, true);
   assert.equal(value.listenerProbeAvailable, true);
+  assert.equal(value.listenerSource, 'powershell');
   assert.equal(value.count, 2);
   assert.equal(value.entries.some((entry) => entry.pid === 4242), false);
   const preview = value.entries.find((entry) => entry.pid === 100);
@@ -319,6 +322,7 @@ test('staleDevProcesses still works without a listener probe and says so', async
   const value = await service.staleDevProcesses();
   assert.equal(value.ok, true);
   assert.equal(value.listenerProbeAvailable, false);
+  assert.equal(value.listenerSource, null);
   assert.equal(value.entries[0].suggested.tool, 'process_kill');
   assert.equal(value.entries[0].port, null);
   assert.match(value.notes.join('\n'), /listener table is unavailable/);
