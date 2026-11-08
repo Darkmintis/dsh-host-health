@@ -286,4 +286,4 @@ Design rules:
 
 ## License
 
-[MIT](LICENSE) © 2026 Dipesh Mahat
+[MIT](LICENSE) © 2026 Darkmintis

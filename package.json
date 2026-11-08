@@ -59,6 +59,7 @@
     "ports",
     "windows"
   ],
+  "author": "Darkmintis",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.10.0",
