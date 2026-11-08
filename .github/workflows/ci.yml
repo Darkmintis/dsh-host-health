@@ -36,7 +36,22 @@ jobs:
         run: npm run lint
 
       - name: Test (node:test, fixtures only)
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+
+      - name: Report failing tests
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f test-output.log ]; then
+            grep -E '✖|not ok|AssertionError|Error:|failureType' test-output.log | head -10 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            echo '--- test output tail ---'
+            tail -n 50 test-output.log
+          fi
 
       - name: Build readiness checks
         run: npm run build
