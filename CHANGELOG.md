@@ -125,6 +125,11 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Fixed
 
+- The Devices dialog now uses the same row format as the host dialog: Device,
+  RAM (used/total), Disk (free), CPU, and Android — with the device name as a
+  prefix when more than one phone is connected.
+
+
 - The composer pill zero-pads its readings (`CPU 05% · RAM 96%`) so the pill does
   not change width between single- and double-digit values.
 - Device rows in the Devices dialog use the same plain label/value styling as the

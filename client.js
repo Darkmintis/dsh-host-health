@@ -647,15 +647,31 @@ window.__ModuleLoader__.load({
     function deviceDialogRows(stats) {
       const mobiles = stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
       if (mobiles.length === 0) return null;
-      return mobiles.map((device) => {
+      const multiple = mobiles.length > 1;
+      /** @type {Array<any>} */
+      const rows = [];
+      for (const device of mobiles) {
         const memory = device.memory !== null && typeof device.memory === 'object' ? device.memory : null;
         const storage = device.storage !== null && typeof device.storage === 'object' ? device.storage : null;
-        const parts = [];
-        if (memory !== null && typeof memory.usedPercent === 'number') parts.push(`RAM ${hdFixed(memory.usedPercent)}%`);
-        if (storage !== null && typeof storage.usedPercent === 'number') parts.push(`disk ${hdFixed(storage.usedPercent)}%`);
-        if (typeof device.cpuPercent === 'number') parts.push(`CPU ${hdFixed(device.cpuPercent)}%`);
-        return hdRow(String(device.model ?? device.serial), parts.length > 0 ? parts.join(' · ') : '—', undefined, String(device.serial));
-      });
+        const name = String(device.model ?? device.serial);
+        const prefix = multiple ? `${name} ` : '';
+        if (!multiple) rows.push(hdRow('Device', name, undefined, `device:${String(device.serial)}`));
+        if (memory !== null && typeof memory.usedPercent === 'number') {
+          rows.push(
+            hdRow(`${prefix}RAM`, `${hdFixed(memory.usedPercent)}% · ${hpBytes(memory.usedBytes ?? 0)} / ${hpBytes(memory.totalBytes ?? 0)}`, undefined, `ram:${String(device.serial)}`),
+          );
+        }
+        if (storage !== null && typeof storage.usedPercent === 'number') {
+          rows.push(hdRow(`${prefix}Disk`, `${hdFixed(storage.usedPercent)}% · ${hpBytes(storage.freeBytes ?? 0)} free`, undefined, `disk:${String(device.serial)}`));
+        }
+        if (typeof device.cpuPercent === 'number') {
+          rows.push(hdRow(`${prefix}CPU`, `${hdFixed(device.cpuPercent)}%`, undefined, `cpu:${String(device.serial)}`));
+        }
+        if (typeof device.androidVersion === 'string') {
+          rows.push(hdRow(`${prefix}Android`, `${device.androidVersion}${typeof device.sdk === 'number' ? ` · SDK ${device.sdk}` : ''}`, undefined, `android:${String(device.serial)}`));
+        }
+      }
+      return rows.length > 0 ? rows : null;
     }
 
     /**
