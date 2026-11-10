@@ -125,9 +125,23 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Fixed
 
+- The composer pill zero-pads its readings (`CPU 05% · RAM 96%`) so the pill does
+  not change width between single- and double-digit values.
+- Device rows in the Devices dialog use the same plain label/value styling as the
+  host rows; storage no longer paints the whole row red at high usage.
+
+### Fixed
+
 - Health dialogs now anchor to the pill that opened them — left edge aligned to
   the pill and 8px above it, clamped to the viewport — instead of centering
   themselves in the window, matching how the shipped statistics dialogs open.
+
+### Fixed
+
+- The composer pill zero-pads its readings (`CPU 05% · RAM 96%`) so the pill does
+  not change width between single- and double-digit values.
+- Device rows in the Devices dialog use the same plain label/value styling as the
+  host rows; storage no longer paints the whole row red at high usage.
 
 ### Fixed
 
@@ -138,9 +152,23 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Fixed
 
+- The composer pill zero-pads its readings (`CPU 05% · RAM 96%`) so the pill does
+  not change width between single- and double-digit values.
+- Device rows in the Devices dialog use the same plain label/value styling as the
+  host rows; storage no longer paints the whole row red at high usage.
+
+### Fixed
+
 - Health dialogs now anchor to the pill that opened them — left edge aligned to
   the pill and 8px above it, clamped to the viewport — instead of centering
   themselves in the window, matching how the shipped statistics dialogs open.
+
+### Fixed
+
+- The composer pill zero-pads its readings (`CPU 05% · RAM 96%`) so the pill does
+  not change width between single- and double-digit values.
+- Device rows in the Devices dialog use the same plain label/value styling as the
+  host rows; storage no longer paints the whole row red at high usage.
 
 ### Fixed
 

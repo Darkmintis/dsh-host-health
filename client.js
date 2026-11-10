@@ -391,6 +391,17 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Two-digit fixed reading so the pill never changes width between single
+     * and double digit values (05%, 96%).
+     * @param {number} value Number.
+     * @returns {string} zero-padded reading.
+     */
+    function hpPad(value) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+      return String(Math.max(0, Math.min(99, Math.round(value)))).padStart(2, '0');
+    }
+
+    /**
      * Alert tone for a 0-100 percentage; undefined when healthy.
      * @param {number} percent Value.
      * @param {number} warn Warn threshold.
@@ -643,8 +654,7 @@ window.__ModuleLoader__.load({
         if (memory !== null && typeof memory.usedPercent === 'number') parts.push(`RAM ${hdFixed(memory.usedPercent)}%`);
         if (storage !== null && typeof storage.usedPercent === 'number') parts.push(`disk ${hdFixed(storage.usedPercent)}%`);
         if (typeof device.cpuPercent === 'number') parts.push(`CPU ${hdFixed(device.cpuPercent)}%`);
-        const storageTone = storage !== null ? hdTone(storage.usedPercent, 85, 95) : undefined;
-        return hdRow(String(device.model ?? device.serial), parts.length > 0 ? parts.join(' · ') : '—', storageTone, String(device.serial));
+        return hdRow(String(device.model ?? device.serial), parts.length > 0 ? parts.join(' · ') : '—', undefined, String(device.serial));
       });
     }
 
@@ -695,7 +705,7 @@ window.__ModuleLoader__.load({
           ? 'Host offline'
           : cpuPercent === null && memPercent === null
             ? 'CPU — · RAM —'
-            : `CPU ${cpuPercent === null ? '—' : hdFixed(cpuPercent)}% · RAM ${memPercent === null ? '—' : hdFixed(memPercent)}%`;
+            : `CPU ${cpuPercent === null ? '—' : hpPad(cpuPercent)}% · RAM ${memPercent === null ? '—' : hpPad(memPercent)}%`;
       const active = health.open === 'host';
       const onClick = () => {
         const element = buttonRef.current;
