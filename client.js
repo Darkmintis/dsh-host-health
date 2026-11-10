@@ -482,7 +482,7 @@ window.__ModuleLoader__.load({
       borderRadius: '6px',
       border: 'none',
       background: 'transparent',
-      color: HP.sub,
+      color: 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))',
       font: 'inherit',
       fontSize: '12px',
       lineHeight: '20px',
@@ -504,9 +504,12 @@ window.__ModuleLoader__.load({
         minWidth: 'min(320px, calc(100vw - 24px))',
         maxWidth: 'min(440px, calc(100vw - 24px))',
         padding: '16px',
-        borderRadius: '12px',
-        border: `1px solid ${HP.border1}`,
-        background: HP.overlay,
+        borderRadius: 'var(--dsw-radius-lg, 12px)',
+        border: 0,
+        background: 'var(--dsw-specific-menu, var(--dsw-alias-bg-overlay))',
+        backdropFilter: 'var(--dsw-menu-backdrop-filter, none)',
+        boxShadow: 'var(--dsw-elevation-prominent, none)',
+        '--dsw-elevation-stroke-color': 'var(--dsw-alias-border-l1)',
         color: HP.sub,
         fontSize: '12px',
         lineHeight: '18px',
@@ -606,7 +609,7 @@ window.__ModuleLoader__.load({
           hdRow(
             'Top CPU',
             topCpu
-              .slice(0, 3)
+              .slice(0, 1)
               .map((process) => `${String(process.name ?? '?')} ${hdFixed(typeof process.cpuPercent === 'number' ? process.cpuPercent : 0)}%`)
               .join(' · '),
           ),
@@ -618,7 +621,7 @@ window.__ModuleLoader__.load({
           hdRow(
             'Top RAM',
             topRam
-              .slice(0, 3)
+              .slice(0, 1)
               .map((process) => `${String(process.name ?? '?')} ${hpBytes((typeof process.ramMb === 'number' ? process.ramMb : 0) * 1024 * 1024)}`)
               .join(' · '),
           ),
@@ -668,7 +671,7 @@ window.__ModuleLoader__.load({
           onClick: props.onClick,
           onMouseEnter: () => setHover(true),
           onMouseLeave: () => setHover(false),
-          style: { ...PILL, background: lit ? HP.layer2 : 'transparent', color: lit ? HP.text : HP.sub },
+          style: { ...PILL, background: lit ? 'var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2))' : 'transparent', color: lit ? HP.sub : 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))' },
         },
         healthIcon(props.icon),
         h('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } }, props.label),
