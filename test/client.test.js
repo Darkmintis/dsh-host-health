@@ -108,10 +108,13 @@ test('client module declares the expected id and read-only card registrations', 
   const { registrations, injectedSlots } = installClient(module);
   const cards = registrations.filter((registration) => registration.options.name === 'tool.call.toolview');
   assert.equal(cards.length, 5);
-  assert.deepEqual([...injectedSlots].sort(), ['shell.overlay', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
-  const strip = registrations.find((registration) => registration.options.name === 'shell.overlay');
-  assert.equal(strip?.options.id, 'host-health', 'the strip is a frame overlay with its own id');
-  assert.equal(typeof strip?.component, 'function', 'the always-visible app-bar strip is registered');
+  assert.deepEqual([...injectedSlots].sort(), ['conversation.composer.dock', 'conversation.composer.dock', 'shell.overlay', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview', 'tool.call.toolview']);
+  const pills = registrations.filter((registration) => registration.options.name === 'conversation.composer.dock');
+  assert.deepEqual(pills.map((registration) => registration.options.id).sort(), ['host-devices', 'host-health'], 'the health pills dock beside the session-statistics pills');
+  assert.equal(typeof pills[0]?.component, 'function');
+  const dialog = registrations.find((registration) => registration.options.name === 'shell.overlay');
+  assert.equal(dialog?.options.id, 'host-health-dialog', 'the dialog layer is a frame overlay with its own id');
+  assert.equal(typeof dialog?.component, 'function', 'the dialog layer is registered');
   assert.equal(registrations.filter((registration) => registration.options.name === 'main').length, 0, 'no separate main panel is registered');
   const keys = cards.map((registration) => registration.options.key);
   assert.deepEqual(keys, ['host_stats', 'ports_list', 'stale_dev_processes', 'port_kill', 'process_kill']);
@@ -122,40 +125,37 @@ test('client module declares the expected id and read-only card registrations', 
   }
 });
 
-test('the app-bar strip renders a compact usage readout without throwing', () => {
+test('the composer pills render a compact reading without throwing', () => {
   const module = loadClientModule().factory(() => createFakeReact());
   const { registrations } = installClient(module);
-  const strip = registrations.find((registration) => registration.options.name === 'shell.overlay');
-  assert.ok(strip, 'strip registration exists');
+  const pills = registrations.filter((registration) => registration.options.name === 'conversation.composer.dock');
+  const host = pills.find((registration) => registration.options.id === 'host-health');
+  const devices = pills.find((registration) => registration.options.id === 'host-devices');
+  assert.ok(host, 'host pill registration exists');
   let tree;
   assert.doesNotThrow(() => {
-    tree = strip.component({});
+    tree = host.component({});
   });
-  assert.equal(tree.props['data-host-health-strip'], 'app-bar');
-  assert.equal(treeContains(tree, 'Host'), true, 'loading label is shown before the first sample');
+  assert.equal(tree.props.kind, 'host', 'the host pill is the ghost pill');
+  assert.match(String(tree.props.label), /CPU .* · RAM /u, 'the pill shows CPU and RAM readings');
+  let devicesTree;
+  assert.doesNotThrow(() => {
+    devicesTree = devices.component({});
+  });
+  assert.equal(devicesTree, null, 'the devices pill hides when no phone is connected');
 });
 
-test('the strip opens a details surface with no loading text and no command lines', () => {
-  const React = createFakeReact();
-  // useState call order: stats, error, open, anchor → force `open` true.
-  let calls = 0;
-  const baseUseState = React.useState;
-  React.useState = (initial) => {
-    calls += 1;
-    return calls === 3 ? [true, () => {}] : baseUseState(initial);
-  };
-  const module = loadClientModule().factory(() => React);
-  const { registrations } = installClient(module);
-  const strip = registrations.find((registration) => registration.options.name === 'shell.overlay');
-  assert.ok(strip);
+test('the health dialog renders host and device rows in the official dl style', () => {
+  const module = loadClientModule().factory(() => createFakeReact());
+  const { registrations, injectedSlots } = installClient(module);
+  const layer = registrations.find((registration) => registration.options.name === 'shell.overlay');
+  assert.ok(layer, 'dialog layer registration exists');
   let tree;
   assert.doesNotThrow(() => {
-    tree = strip.component({});
+    tree = layer.component({});
   });
-  assert.equal(treeContains(tree, 'Host health'), true, 'the popover header renders');
-  const rendered = collectText(tree).join('\n');
-  assert.doesNotMatch(rendered, /Loading host stats|Reading listeners|Scanning dev processes|Loading/i, 'no loading placeholders remain');
-  assert.doesNotMatch(rendered, /commandLine|Command/i, 'process tables never show command lines');
+  assert.equal(tree, null, 'the dialog stays closed until a pill is clicked');
+  assert.deepEqual([...new Set(injectedSlots)].sort(), ['conversation.composer.dock', 'shell.overlay', 'tool.call.toolview']);
 });
 
 test('card components never throw on missing or malformed props', () => {

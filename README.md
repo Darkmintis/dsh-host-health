@@ -81,34 +81,33 @@ These paths are placeholders; add the real captures before the first tagged rele
 
 ## Visual panel
 
-Installing the bundle also adds a compact **usage strip pinned to the window's
-top strip** (top-right, just left of minimize/maximize/close). It is registered
-in the frame-wide overlay layer, so it stays visible in every Session and
-workspace — chat, settings, and archives alike:
+Installing the bundle also adds **two ghost pills in the composer dock**, in the
+same row as the shipped "N turns M steps" and "Cache hit" readings: `CPU 18% ·
+RAM 74%`, plus `2 devices` when phones are attached. They use the shipped pill
+typography (12px, line icon, transparent background, subtle hover fill) and open
+a dialog built like the official **Session statistics** / **Token usage**
+dialogs: title row with icon and key number, a half-pixel rule, then a
+two-column label/value grid:
 
 ```
-● CPU 18% · RAM 74% · 37.5 GB free   ▾
+                              ⏱ CPU 18% · RAM 74%   📱 2 devices
 ```
 
-- The strip refreshes every three seconds and turns amber at 80% RAM and red at
-  92% RAM or when the Host API is unreachable. It also shows battery state when
-  the host reports a battery.
-- Clicking it opens a modern, single-surface popover — fixed-positioned so the
-  header cannot clip it — with a **target switcher** (This PC plus every
-  connected Android device), headline CPU/memory cards, a colourful storage card
-  with every fixed volume, per-core bars, battery/AC state, GPU, committed
-  memory, and one **sortable process table** (Process · RAM · CPU · PID — click a
-  value column to flip highest/lowest). Process rows never show command lines.
-  Data is fetched when the plugin loads and refreshed every three seconds, so the
-  popover opens already populated instead of showing a loading state.
-- Choose a phone in the switcher to read that device's RAM, /data usage, CPU,
-  and battery without leaving the Harness.
-- Kill buttons ask for a browser confirmation, then call the same service methods
-  as `port_kill` / `process_kill`, so identity re-verification and protected-PID
-  refusals are identical. The panel requests go through the Host web server and
-  are rejected unless they pass the connection trust fence.
+- The pills live in the composer dock right after the shipped statistics, so
+  they appear in every Session and stay out of the way. The host pill is always
+  visible once the first snapshot arrives; the devices pill only appears when at
+  least one Android device is attached.
+- Clicking a pill opens its dialog above the composer: **Host health** shows CPU
+  (with peak core), memory used/total plus committed bytes, every fixed disk
+  (C:, D:) with free space, process count, uptime, and the top CPU / top RAM
+  processes; **Devices** shows one row per phone with RAM, `/data`, and CPU.
+- Memory, disk, and device values turn amber above 80% and red above 92%, so a
+  full disk or a memory-hungry emulator is visible at a glance. Process rows
+  never show command lines, and the overlay shows no battery reading.
+- The pills refresh every 2.5 seconds and poll the authenticated same-origin Host
+  API; the dialog reports fetch failures instead of rendering empty.
 
-The strip is registered only in profiles that compose the Web server and
+The pills are registered only in profiles that compose the Web server and
 connection services; headless profiles keep the five tools.
 
 > Upgrading a bundle updates the Host half when the app starts, so quit and

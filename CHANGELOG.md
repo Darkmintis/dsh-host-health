@@ -20,10 +20,30 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
+
+### Changed
+
 - The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
   highest or lowest) instead of separate top-CPU and top-RAM tables, and a
   **target switcher** that shows this PC or any connected Android device's RAM,
   storage, CPU, and battery in place.
+
+### Changed
+
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
 
 ### Changed
 
@@ -63,10 +83,30 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
+
+### Changed
+
 - The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
   highest or lowest) instead of separate top-CPU and top-RAM tables, and a
   **target switcher** that shows this PC or any connected Android device's RAM,
   storage, CPU, and battery in place.
+
+### Changed
+
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
 
 ### Changed
 
@@ -115,10 +155,30 @@ Initial release. Package `@darkmintis/dsh-host-health`, a DeepSeek Harness profi
 
 ### Changed
 
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
+
+### Changed
+
 - The dropdown has one **sortable process table** (click RAM/CPU/PID to sort
   highest or lowest) instead of separate top-CPU and top-RAM tables, and a
   **target switcher** that shows this PC or any connected Android device's RAM,
   storage, CPU, and battery in place.
+
+### Changed
+
+- The health overlay is now two **ghost pills in the composer dock**, matching the
+  shipped "N turns M steps" / "Cache hit" pills, with dialogs styled like the
+  official Session statistics and Token usage panels (icon title, key number,
+  half-pixel rule, two-column label/value grid). Host dialog shows CPU (peak
+  core), memory + committed, every fixed volume, process count, uptime, and top
+  CPU/RAM processes; the devices pill appears only when an Android device is
+  attached and lists RAM / `/data` / CPU per device. Battery is no longer shown.
 
 ### Changed
 
