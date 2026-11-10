@@ -125,10 +125,22 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Fixed
 
+- Health dialogs now anchor to the pill that opened them — left edge aligned to
+  the pill and 8px above it, clamped to the viewport — instead of centering
+  themselves in the window, matching how the shipped statistics dialogs open.
+
+### Fixed
+
 - Health dialogs now use the shipped menu surface (`--dsw-specific-menu` with
   elevation/backdrop tokens) instead of the generic overlay background, so they
   match the official Session statistics / Token usage dialogs. Top CPU and top
   RAM rows show a single process each (the three-row lists churned too fast).
+
+### Fixed
+
+- Health dialogs now anchor to the pill that opened them — left edge aligned to
+  the pill and 8px above it, clamped to the viewport — instead of centering
+  themselves in the window, matching how the shipped statistics dialogs open.
 
 ### Fixed
 

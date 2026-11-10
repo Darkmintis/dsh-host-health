@@ -496,8 +496,6 @@ window.__ModuleLoader__.load({
     const HS = {
       panel: {
         position: 'fixed',
-        left: '50%',
-        transform: 'translateX(-50%)',
         zIndex: 2101,
         boxSizing: 'border-box',
         width: 'max-content',
@@ -734,9 +732,10 @@ window.__ModuleLoader__.load({
      * @returns {any|null} dialog element or null while closed.
      */
     function HealthLayer() {
-      const { useRef, useEffect } = React;
+      const { useState, useRef, useEffect } = React;
       const health = useHealth();
       const dialogRef = useRef(null);
+      const [pos, setPos] = useState(null);
       const open = health.open;
 
       useEffect(() => {
@@ -762,13 +761,44 @@ window.__ModuleLoader__.load({
         };
       }, [open]);
 
+      useEffect(() => {
+        if (open === null) {
+          setPos(null);
+          return undefined;
+        }
+        const place = () => {
+          const panel = dialogRef.current;
+          const anchor = health.anchor;
+          if (panel === null || panel === undefined || anchor === null || typeof anchor !== 'object') return;
+          const margin = 12;
+          const gap = 8;
+          const width = typeof panel.offsetWidth === 'number' && panel.offsetWidth > 0 ? panel.offsetWidth : 320;
+          const height = typeof panel.offsetHeight === 'number' && panel.offsetHeight > 0 ? panel.offsetHeight : 0;
+          const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
+          const viewportHeight = typeof window === 'undefined' ? 800 : window.innerHeight;
+          const left = Math.max(margin, Math.min(typeof anchor.left === 'number' ? anchor.left : margin, viewportWidth - width - margin));
+          let bottom = Math.max(margin, viewportHeight - (typeof anchor.top === 'number' ? anchor.top : viewportHeight - 80) + gap);
+          if (height > 0 && viewportHeight - bottom - height < margin) bottom = Math.max(margin, viewportHeight - margin - height);
+          setPos({ left, bottom });
+        };
+        place();
+        if (typeof window === 'undefined') return undefined;
+        window.addEventListener('resize', place);
+        return () => window.removeEventListener('resize', place);
+      }, [open, health.anchor]);
+
       if (open === null) return null;
       const isHost = open === 'host';
       const stats = health.stats;
       const rows = isHost ? hostDialogRows(stats) : deviceDialogRows(stats);
       const viewportHeight = typeof window === 'undefined' ? 800 : window.innerHeight;
-      const anchorTop = health.anchor !== null && typeof health.anchor === 'object' && typeof health.anchor.top === 'number' ? health.anchor.top : viewportHeight - 80;
-      const bottom = Math.max(12, Math.min(viewportHeight - 12, viewportHeight - anchorTop + 8));
+      const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
+      const anchor = health.anchor;
+      const anchorTop = anchor !== null && typeof anchor === 'object' && typeof anchor.top === 'number' ? anchor.top : viewportHeight - 80;
+      const anchorLeft = anchor !== null && typeof anchor === 'object' && typeof anchor.left === 'number' ? anchor.left : 12;
+      const estimatedWidth = 320;
+      const left = pos !== null ? pos.left : Math.max(12, Math.min(anchorLeft, viewportWidth - estimatedWidth - 12));
+      const bottom = pos !== null ? pos.bottom : Math.max(12, Math.min(viewportHeight - 12, viewportHeight - anchorTop + 8));
       const host = stats !== null && typeof stats === 'object' && stats.host !== null && typeof stats.host === 'object' ? stats.host : null;
       const titleValue = isHost ? (host !== null && typeof host.uptimeSeconds === 'number' ? hpUptime(host.uptimeSeconds) : '—') : `${(stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : []).length} connected`;
 
@@ -777,7 +807,7 @@ window.__ModuleLoader__.load({
         { 'data-host-health-layer': 'open', style: { position: 'fixed', inset: 0, zIndex: 2100, pointerEvents: 'none' } },
         h(
           'div',
-          { ref: dialogRef, role: 'dialog', 'aria-label': isHost ? 'Host health' : 'Devices', style: { ...HS.panel, bottom: `${bottom}px` } },
+          { ref: dialogRef, role: 'dialog', 'aria-label': isHost ? 'Host health' : 'Devices', style: { ...HS.panel, left: `${left}px`, bottom: `${bottom}px` } },
           h(
             'div',
             { style: HS.title },
