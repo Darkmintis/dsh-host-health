@@ -123,6 +123,13 @@ All notable changes to this project are documented in this file. The format is b
   and the process count. Overflow-friendly text rendering and dropdown UI
   (per-core bars, per-volume bars, battery line).
 
+### Changed
+
+- The Devices dialog now renders one **boxed card per connected device**, matching
+  the fleet overlay: device-type accent edge and glyph (brand = emulator, success
+  = physical), model + serial header, a "phone"/"emulator" pill, and RAM / Disk /
+  CPU / Android rows in the same label/value format as the host stats.
+
 ### Fixed
 
 - The Devices dialog now uses the same row format as the host dialog: Device,

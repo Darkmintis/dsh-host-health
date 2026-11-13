@@ -558,6 +558,15 @@ window.__ModuleLoader__.load({
       if (kind === 'phone') {
         return h('svg', shared, h('rect', { x: '7', y: '2', width: '10', height: '20', rx: '2' }), h('line', { x1: '11', y1: '18', x2: '13', y2: '18' }));
       }
+      if (kind === 'emulator') {
+        return h(
+          'svg',
+          shared,
+          h('rect', { x: '2.5', y: '4', width: '19', height: '13', rx: '2' }),
+          h('path', { d: 'M8 21h8' }),
+          h('path', { d: 'M12 17v4' }),
+        );
+      }
       return h(
         'svg',
         shared,
@@ -644,34 +653,99 @@ window.__ModuleLoader__.load({
      * @param {Record<string, any>|null} stats Snapshot.
      * @returns {Array<any>|null} rows, or null when no device is connected.
      */
-    function deviceDialogRows(stats) {
-      const mobiles = stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
-      if (mobiles.length === 0) return null;
-      const multiple = mobiles.length > 1;
+    /**
+     * Detect emulator devices from their serial/model; adb exposes no flag.
+     * @param {Record<string, any>} device Mobile snapshot entry.
+     * @returns {boolean} true for an emulator.
+     */
+    function isEmulatorDevice(device) {
+      const serial = String(device.serial ?? '');
+      const model = String(device.model ?? '');
+      return /^emulator-/u.test(serial) || /sdk_gphone|emulator/iu.test(model);
+    }
+
+    /**
+     * One boxed device card in the Devices dialog: the same label/value metrics
+     * as the host rows, with a device-type accent edge for quick identification.
+     * @param {{ device: Record<string, any> }} props Card props.
+     * @returns {any} card element.
+     */
+    function DeviceCard(props) {
+      const device = props.device ?? {};
+      const serial = String(device.serial ?? 'unknown');
+      const model = String(device.model ?? serial);
+      const emulator = isEmulatorDevice(device);
+      const accent = emulator ? HP.brand : HP.ok;
+      const memory = device.memory !== null && typeof device.memory === 'object' ? device.memory : null;
+      const storage = device.storage !== null && typeof device.storage === 'object' ? device.storage : null;
       /** @type {Array<any>} */
       const rows = [];
-      for (const device of mobiles) {
-        const memory = device.memory !== null && typeof device.memory === 'object' ? device.memory : null;
-        const storage = device.storage !== null && typeof device.storage === 'object' ? device.storage : null;
-        const name = String(device.model ?? device.serial);
-        const prefix = multiple ? `${name} ` : '';
-        if (!multiple) rows.push(hdRow('Device', name, undefined, `device:${String(device.serial)}`));
-        if (memory !== null && typeof memory.usedPercent === 'number') {
-          rows.push(
-            hdRow(`${prefix}RAM`, `${hdFixed(memory.usedPercent)}% · ${hpBytes(memory.usedBytes ?? 0)} / ${hpBytes(memory.totalBytes ?? 0)}`, undefined, `ram:${String(device.serial)}`),
-          );
-        }
-        if (storage !== null && typeof storage.usedPercent === 'number') {
-          rows.push(hdRow(`${prefix}Disk`, `${hdFixed(storage.usedPercent)}% · ${hpBytes(storage.freeBytes ?? 0)} free`, undefined, `disk:${String(device.serial)}`));
-        }
-        if (typeof device.cpuPercent === 'number') {
-          rows.push(hdRow(`${prefix}CPU`, `${hdFixed(device.cpuPercent)}%`, undefined, `cpu:${String(device.serial)}`));
-        }
-        if (typeof device.androidVersion === 'string') {
-          rows.push(hdRow(`${prefix}Android`, `${device.androidVersion}${typeof device.sdk === 'number' ? ` · SDK ${device.sdk}` : ''}`, undefined, `android:${String(device.serial)}`));
-        }
+      if (memory !== null && typeof memory.usedPercent === 'number') {
+        rows.push(hdRow('RAM', `${hdFixed(memory.usedPercent)}% · ${hpBytes(memory.usedBytes ?? 0)} / ${hpBytes(memory.totalBytes ?? 0)}`, undefined, `mem:${serial}`));
       }
-      return rows.length > 0 ? rows : null;
+      if (storage !== null && typeof storage.usedPercent === 'number') {
+        rows.push(hdRow('Disk', `${hdFixed(storage.usedPercent)}% · ${hpBytes(storage.freeBytes ?? 0)} free`, undefined, `disk:${serial}`));
+      }
+      if (typeof device.cpuPercent === 'number') rows.push(hdRow('CPU', `${hdFixed(device.cpuPercent)}%`, undefined, `cpu:${serial}`));
+      if (typeof device.androidVersion === 'string') {
+        rows.push(hdRow('Android', `${device.androidVersion}${typeof device.sdk === 'number' ? ` · SDK ${device.sdk}` : ''}`, undefined, `android:${serial}`));
+      }
+      return h(
+        'div',
+        {
+          key: serial,
+          'data-health-device': serial,
+          'data-device-kind': emulator ? 'emulator' : 'physical',
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '10px 12px',
+            borderRadius: '10px',
+            border: `1px solid ${HP.border1}`,
+            borderLeft: `3px solid ${accent}`,
+            background: HP.layer1,
+          },
+        },
+        h(
+          'div',
+          { style: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 } },
+          h('span', { style: { display: 'inline-flex', color: HP.sub } }, healthIcon(emulator ? 'emulator' : 'phone')),
+          h(
+            'div',
+            { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: '1 1 auto' } },
+            h(
+              'span',
+              { style: { fontWeight: 700, fontSize: '12.5px', color: HP.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+              model,
+            ),
+            h(
+              'span',
+              { style: { color: HP.sub, fontSize: '10.5px', fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+              serial,
+            ),
+          ),
+          h(
+            'span',
+            { style: { display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: '999px', border: `1px solid ${accent}`, color: accent, fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap' } },
+            emulator ? 'emulator' : 'physical',
+          ),
+        ),
+        rows.length > 0
+          ? h('dl', { style: { ...HS.dl, gap: '4px 16px' }, 'data-health-device-rows': serial }, rows)
+          : h('div', { style: HS.empty }, 'Waiting for the first sample…'),
+      );
+    }
+
+    /**
+     * Boxed cards for every connected device.
+     * @param {Record<string, any>|null} stats Snapshot.
+     * @returns {Array<any>|null} cards, or null when no device is connected.
+     */
+    function deviceCards(stats) {
+      const mobiles = stats !== null && typeof stats === 'object' && Array.isArray(stats.mobiles) ? stats.mobiles : [];
+      if (mobiles.length === 0) return null;
+      return mobiles.map((device) => h(DeviceCard, { key: `device:${String(device.serial)}`, device }));
     }
 
     /**
@@ -816,7 +890,8 @@ window.__ModuleLoader__.load({
       if (open === null) return null;
       const isHost = open === 'host';
       const stats = health.stats;
-      const rows = isHost ? hostDialogRows(stats) : deviceDialogRows(stats);
+      const rows = isHost ? hostDialogRows(stats) : null;
+      const deviceBoxes = isHost ? null : deviceCards(stats);
       const viewportHeight = typeof window === 'undefined' ? 800 : window.innerHeight;
       const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
       const anchor = health.anchor;
@@ -841,9 +916,13 @@ window.__ModuleLoader__.load({
             h('span', { style: HS.titleValue }, titleValue),
           ),
           h('div', { style: HS.rule, 'aria-hidden': true }),
-          rows !== null
-            ? h('dl', { style: HS.dl, 'data-host-health-rows': isHost ? 'host' : 'devices' }, rows)
-            : h('div', { style: HS.empty }, health.error !== null ? health.error : 'Waiting for the first host snapshot…'),
+          isHost
+            ? rows !== null
+              ? h('dl', { style: HS.dl, 'data-host-health-rows': 'host' }, rows)
+              : h('div', { style: HS.empty }, health.error !== null ? health.error : 'Waiting for the first host snapshot…')
+            : deviceBoxes !== null
+              ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' }, 'data-host-health-devices': 'boxes' }, deviceBoxes)
+              : h('div', { style: HS.empty }, health.error !== null ? health.error : 'Waiting for the first device snapshot…'),
         ),
       );
     }
